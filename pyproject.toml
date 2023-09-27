@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "remoteplay"
+version = "0.0.1"
+authors = [
+  { name="ZudlJK", email="zudjl@email.de" }
+]
+description = "Start a game on a remote system"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    'paramiko',
+    'python-steam-api',
+    'beautifulsoup4'
+]
+
+[project.urls]
+"Homepage" = "https://github.com/zudljk/remoteplay"
+"Bug Tracker" = "https://github.com/zudljk/remoteplay/issues"
+
+[project.scripts]
+remoteplay = "remoteplay:main"

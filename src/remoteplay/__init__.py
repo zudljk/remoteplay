@@ -5,12 +5,11 @@ from json import dump, loads
 from os.path import expanduser
 from pathlib import Path
 from sys import stderr
-import steam
 
 from paramiko import SSHClient, Transport, AutoAddPolicy, RSAKey
 from paramiko.ssh_exception import AuthenticationException
 
-from forward import forward_tunnel
+from .forward import forward_tunnel
 
 
 def create_ssh_client():
@@ -107,6 +106,7 @@ def ensure_paperspace_logged_in(api_key):
         if not api_key:
             fail("Not logged in to Paperspace and no API key given")
         create(config_file, {"apiKey": api_key, "name": "remoteplay"})
+    print(f"Logged in to Paperspace")
 
 
 def ensure_paperspace_started(api_key, machine_id):
@@ -131,6 +131,7 @@ def build_command(game, ptf):
 def execute_remote_command(client, command, host, port=22, identity_file=None):
     key = RSAKey.from_private_key_file(identity_file)
     client.connect(host, port, pkey=key)
+    print(f"Executing remote command: {command}")
     stdin, stdout, stderr = client.exec_command(command)
     return stdout.channel.recv_exit_status()
 
@@ -171,7 +172,10 @@ def run_remote_game(config):
     start_remote_desktop()
 
 
-if __name__ == '__main__':
+def main():
     run_remote_game(get_config())
+
+if __name__ == '__main__':
+    main()
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
