@@ -92,7 +92,8 @@ def exec_local_command(command, asynch=False):
         out = a.stdout.decode('utf-8')
         err = a.stderr.decode('utf-8')
         debug(out)
-        error(err)
+        if err and log.getEffectiveLevel() == DEBUG:
+            error(err)
         return rc, out, err
     except FileNotFoundError:
         return 1, None, "No such file"
