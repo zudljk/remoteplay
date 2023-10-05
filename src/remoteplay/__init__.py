@@ -8,15 +8,26 @@ from pathlib import Path
 from sys import stderr
 from sys import executable
 from re import search
+from logging import getLogger, error, ERROR, warn, WARNING, debug, DEBUG, info, INFO
 
 from paramiko import SSHClient, Transport, AutoAddPolicy, RSAKey
 from paramiko.ssh_exception import AuthenticationException
 
 from .forward import forward_tunnel
 
+log = getLogger(__name__)
+
+loglevels = {
+    "error": ERROR,
+    "warn": WARNING,
+    "warning": WARNING,
+    "info": INFO,
+    "debug": DEBUG
+}
+
 commands = {
     "Windows": {
-        "npm": "npm.com", 
+        "npm": "npm.cmd", 
         "paperspace": "paperspace.cmd", 
         "parsecd": Path("C:/", "Program Files (x86)", "Parsec", "parsecd")
     },
@@ -58,6 +69,7 @@ def get_config():
     parser = argparse.ArgumentParser(description="Run a remote game on a Paperspace instance",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--version", action="version", version=version())
+    parser.add_argument("--log-level", help="Set log level", default="info")
     parser.add_argument("-p", "--platform", required=True, choices=["steam", "gog", "origin"],
                         help="Platform (steam, gog, or origin)")
     parser.add_argument("-m", "--machine", required=True,
@@ -70,21 +82,19 @@ def get_config():
     return vars(args)
 
 
-def exec_local_command(command, verbose=False, asynch=False):
-    print(f"Running command: {command}")
+def exec_local_command(command, asynch=False):
+    debug(f"Running command: {command}")
     try:
         if asynch:
             Popen(str(command).split())
             return 0, "", ""
-        else:
-            a = run(str(command).split(), stdout=PIPE, stderr=PIPE)
-            rc = a.returncode
-            out = a.stdout.decode('utf-8')
-            err = a.stderr.decode('utf-8')
-            if verbose:
-                print(out)
-                print(err, file=stderr)
-            return rc, out, err
+        a = run(str(command).split(), stdout=PIPE, stderr=PIPE)
+        rc = a.returncode
+        out = a.stdout.decode('utf-8')
+        err = a.stderr.decode('utf-8')
+        debug(out)
+        error(err)
+        return rc, out, err
     except FileNotFoundError:
         return 1, None, "No such file"
 
@@ -100,7 +110,7 @@ def is_paperspace_installed():
 
 
 def install_paperspace():
-    print("Installing paperspace-node ...")
+    info("Installing paperspace-node ...")
     rv, out, err = exec_local_command(f"{npm} i -g paperspace-node")
     if rv != 0:
         print(err)
@@ -132,12 +142,12 @@ def ensure_paperspace_logged_in(api_key):
         if not api_key:
             fail("Not logged in to Paperspace and no API key given")
         create(config_file, {"apiKey": api_key, "name": "remoteplay"})
-    print(f"Logged in to Paperspace")
+    info(f"Logged in to Paperspace")
 
 
 def ensure_paperspace_started(api_key, machine_id):
     ensure_paperspace_logged_in(api_key)
-    print(f"Starting machine {machine_id}")
+    info(f"Starting machine {machine_id}")
     for cmd in "start", "waitfor":
         if not exec_local_command(f'{paperspace} machines {cmd} --machineId {machine_id} --state ready'):
             fail("Could not start Paperspace machine")
@@ -157,7 +167,7 @@ def build_command(game, ptf):
 def execute_remote_command(client, command, host, port=22, identity_file=None):
     key = RSAKey.from_private_key_file(identity_file)
     client.connect(host, port, pkey=key)
-    print(f"Executing remote command: {command}")
+    debug(f"Executing remote command: {command}")
     stdin, stdout, stderr = client.exec_command(command)
     return stdout.channel.recv_exit_status()
 
@@ -181,11 +191,12 @@ def get_platform_command(command):
 def start_remote_desktop():
     rv, out, err = exec_local_command(get_platform_command("parsecd"), asynch=True)
     if rv != 0:
-        print(err, file=stderr)
+        error(err, file=stderr)
         fail("Could not start Parsec client")
 
 
 def run_remote_game(config):
+    log.setLevel(loglevels.get(config["log_level"]), INFO)
     client = create_ssh_client()
     api_key = config["paperspace_apikey"] if "paperspace_apikey" in config else None
     machine_id, host = get_paperspace_machine(api_key, config["machine"])
@@ -195,7 +206,7 @@ def run_remote_game(config):
     try:
         execute_remote_command(client, command, host, identity_file=expanduser(config['identity']))
     except AuthenticationException:
-        print("Login to remote machine failed: Not authorized", file=stderr)
+        error("Login to remote machine failed: Not authorized", file=stderr)
     start_remote_desktop()
 
 
