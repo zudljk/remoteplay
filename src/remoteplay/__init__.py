@@ -52,7 +52,7 @@ def exec_local_command(command, verbose=False, asynch=False):
             Popen(str(command).split())
             return 0, "", ""
         else:
-            a = run(str(command).split(), stdout=PIPE, stderr=PIPE)
+            a = run(str(command).split(), stdout=PIPE, stderr=PIPE, shell=True)
             rc = a.returncode
             out = a.stdout.decode('utf-8')
             err = a.stderr.decode('utf-8')
@@ -136,7 +136,8 @@ def execute_remote_command(client, command, host, port=22, identity_file=None):
     return stdout.channel.recv_exit_status()
 
 
-def get_paperspace_machine(machine):
+def get_paperspace_machine(api_key, machine):
+    ensure_paperspace_logged_in(api_key)
     rv, out, err = exec_local_command("paperspace machines list")
     if rv != 0:
         fail(err)
@@ -161,8 +162,9 @@ def start_remote_desktop():
 
 def run_remote_game(config):
     client = create_ssh_client()
-    machine_id, host = get_paperspace_machine(config["machine"])
-    ensure_paperspace_started(config["apikey"] if "apikey" in config else None, machine_id)
+    api_key = config["apikey"] if "apikey" in config else None
+    machine_id, host = get_paperspace_machine(api_key, config["machine"])
+    ensure_paperspace_started(api_key, machine_id)
     command = build_command(config['game'], config["platform"])
     # open_tunnel(7575, host, 7575, create_ssh_transport(host, ))
     try:
