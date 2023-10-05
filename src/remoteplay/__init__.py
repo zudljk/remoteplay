@@ -3,8 +3,11 @@ import platform
 from subprocess import Popen, run, PIPE
 from json import dump, loads
 from os.path import expanduser
+from os import mkdir
 from pathlib import Path
 from sys import stderr
+from sys import executable
+from re import search
 
 from paramiko import SSHClient, Transport, AutoAddPolicy, RSAKey
 from paramiko.ssh_exception import AuthenticationException
@@ -30,10 +33,21 @@ def open_tunnel(localport, host, port, transport):
     forward_tunnel(localport, host, port, transport)
 
 
+def version():
+    rc, out, err = exec_local_command(f'{executable} -m pip show remoteplay')
+    if rc != 0:
+        fail(err)
+    m = search("Version: ([0-9.]+)", out)
+    if not m:
+        return "unknown"
+    return m.group()
+
+
 def get_config():
     default_id = Path.home() / '.ssh' / 'id_rsa'
     parser = argparse.ArgumentParser(description="Run a remote game on a Paperspace instance",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--version", action="version", version=version())
     parser.add_argument("-p", "--platform", required=True, choices=["steam", "gog", "origin"],
                         help="Platform (steam, gog, or origin)")
     parser.add_argument("-m", "--machine", required=True,
@@ -52,7 +66,7 @@ def exec_local_command(command, verbose=False, asynch=False):
             Popen(str(command).split())
             return 0, "", ""
         else:
-            a = run(str(command).split(), stdout=PIPE, stderr=PIPE, shell=True)
+            a = run(str(command).split(), stdout=PIPE, stderr=PIPE)
             rc = a.returncode
             out = a.stdout.decode('utf-8')
             err = a.stderr.decode('utf-8')
@@ -95,7 +109,8 @@ def ensure_paperspace_installed():
 
 
 def create(config_file, content):
-    with open(config_file.absolute(), "w") as pconfig:
+    mkdir(config_file.parent)
+    with open(config_file.absolute(), "w", encoding='utf8') as pconfig:
         dump(content, pconfig)
 
 
@@ -162,7 +177,7 @@ def start_remote_desktop():
 
 def run_remote_game(config):
     client = create_ssh_client()
-    api_key = config["apikey"] if "apikey" in config else None
+    api_key = config["paperspace_apikey"] if "paperspace_apikey" in config else None
     machine_id, host = get_paperspace_machine(api_key, config["machine"])
     ensure_paperspace_started(api_key, machine_id)
     command = build_command(config['game'], config["platform"])
