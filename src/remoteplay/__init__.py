@@ -3,7 +3,6 @@ import platform
 from subprocess import Popen, run, PIPE
 from json import dump, loads
 from os.path import expanduser
-from os import mkdir
 from pathlib import Path
 from sys import stderr
 from sys import executable
@@ -130,7 +129,7 @@ def ensure_paperspace_installed():
 
 
 def create(config_file, content):
-    mkdir(config_file.parent)
+    config_file.parent.mkdir(parents=True, exist_ok=True)
     with open(config_file.absolute(), "w", encoding='utf8') as pconfig:
         dump(content, pconfig)
 
