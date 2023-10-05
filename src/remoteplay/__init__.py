@@ -14,6 +14,17 @@ from paramiko.ssh_exception import AuthenticationException
 
 from .forward import forward_tunnel
 
+commands = {
+    "Windows": {
+        "npm": "npm.com", 
+        "paperspace": "paperspace.cmd", 
+        "parsecd": Path("C:/", "Program Files (x86)", "Parsec", "parsecd")
+    },
+    "Darwin": {
+        "parsecd": Path("/Applications") / "Parsec.app" / "Contents" / "MacOS" / "parsecd"
+    }
+}
+
 
 def create_ssh_client():
     client = SSHClient()
@@ -40,7 +51,7 @@ def version():
     m = search("Version: ([0-9.]+)", out)
     if not m:
         return "unknown"
-    return m.group()
+    return m.group(1)
 
 
 def get_config():
@@ -159,6 +170,12 @@ def get_paperspace_machine(api_key, machine):
     p = loads(out)
     m = next((x for x in p if x["id"] == machine or x["name"] == machine))
     return m["id"], m["publicIpAddress"]
+
+
+def get_platform_command(command):
+    if platform.system() in commands:
+        return commands.get(platform.system()).get(command, command)
+    fail(f"Platform {platform.system()} not supported yet")
 
 
 def start_remote_desktop():
