@@ -71,6 +71,7 @@ def get_config():
 
 
 def exec_local_command(command, verbose=False, asynch=False):
+    print("Running command: {command}")
     try:
         if asynch:
             Popen(str(command).split())
