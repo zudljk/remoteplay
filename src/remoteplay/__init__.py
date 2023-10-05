@@ -196,7 +196,7 @@ def start_remote_desktop():
 
 
 def run_remote_game(config):
-    log.setLevel(loglevels.get(config["log_level"]), INFO)
+    log.setLevel(loglevels.get(config["log_level"], INFO))
     client = create_ssh_client()
     api_key = config["paperspace_apikey"] if "paperspace_apikey" in config else None
     machine_id, host = get_paperspace_machine(api_key, config["machine"])
