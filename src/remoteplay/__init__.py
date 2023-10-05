@@ -25,7 +25,6 @@ commands = {
     }
 }
 
-
 def create_ssh_client():
     client = SSHClient()
     client.load_system_host_keys()
@@ -90,18 +89,18 @@ def exec_local_command(command, verbose=False, asynch=False):
 
 
 def is_node_installed():
-    rv, out, err = exec_local_command("npm -v")
+    rv, out, err = exec_local_command(f"{npm} -v")
     return rv == 0 and not err
 
 
 def is_paperspace_installed():
-    rv, out, err = exec_local_command("npm ls -g paperspace-node")
+    rv, out, err = exec_local_command(f"{npm} ls -g paperspace-node")
     return rv == 0 and not err
 
 
 def install_paperspace():
     print("Installing paperspace-node ...")
-    rv, out, err = exec_local_command("npm i -g paperspace-node")
+    rv, out, err = exec_local_command(f"{npm} i -g paperspace-node")
     if rv != 0:
         print(err)
     return rv == 0 and not err
@@ -139,7 +138,7 @@ def ensure_paperspace_started(api_key, machine_id):
     ensure_paperspace_logged_in(api_key)
     print(f"Starting machine {machine_id}")
     for cmd in "start", "waitfor":
-        if not exec_local_command(f'paperspace machines {cmd} --machineId {machine_id} --state ready'):
+        if not exec_local_command(f'{paperspace} machines {cmd} --machineId {machine_id} --state ready'):
             fail("Could not start Paperspace machine")
 
 
@@ -164,7 +163,7 @@ def execute_remote_command(client, command, host, port=22, identity_file=None):
 
 def get_paperspace_machine(api_key, machine):
     ensure_paperspace_logged_in(api_key)
-    rv, out, err = exec_local_command("paperspace machines list")
+    rv, out, err = exec_local_command(f"{paperspace} machines list")
     if rv != 0:
         fail(err)
     p = loads(out)
@@ -179,14 +178,7 @@ def get_platform_command(command):
 
 
 def start_remote_desktop():
-    cmd = "parsecd"
-    if platform.system() == 'Darwin':
-        cmd = Path("/Applications") / "Parsec.app" / "Contents" / "MacOS" / cmd
-    elif platform.system() == 'Linux':
-        fail("Platform Linux not supported yet")
-    else:
-        cmd = Path("C:/", "Program Files (x86)", "Parsec", cmd)
-    rv, out, err = exec_local_command(cmd, asynch=True)
+    rv, out, err = exec_local_command(get_platform_command("parsecd"), asynch=True)
     if rv != 0:
         print(err, file=stderr)
         fail("Could not start Parsec client")
@@ -204,6 +196,10 @@ def run_remote_game(config):
     except AuthenticationException:
         print("Login to remote machine failed: Not authorized", file=stderr)
     start_remote_desktop()
+
+
+paperspace = get_platform_command("paperspace")
+npm = get_platform_command("npm")
 
 
 def main():
