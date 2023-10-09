@@ -14,7 +14,7 @@ from paramiko.ssh_exception import AuthenticationException
 
 from .forward import forward_tunnel
 
-log = getLogger(__name__)
+log = getLogger("root")
 
 loglevels = {
     "error": ERROR,
