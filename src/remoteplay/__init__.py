@@ -8,11 +8,13 @@ from sys import stderr
 from sys import executable
 from re import search
 from logging import getLogger, error, ERROR, warn, WARNING, debug, DEBUG, info, INFO
+from time import sleep
 
 from paramiko import SSHClient, Transport, AutoAddPolicy, RSAKey
 from paramiko.ssh_exception import AuthenticationException
 
 from .forward import forward_tunnel
+from .paperspace import list_machines, start_machine
 
 log = getLogger("root")
 
@@ -28,7 +30,7 @@ commands = {
     "Windows": {
         "npm": "npm.cmd", 
         "paperspace": "paperspace.cmd", 
-        "parsecd": Path("C:/", "Program Files (x86)", "Parsec", "parsecd")
+        "parsecd": Path("C:/", "Program Files", "Parsec", "parsecd.exe")
     },
     "Darwin": {
         "parsecd": Path("/Applications") / "Parsec.app" / "Contents" / "MacOS" / "parsecd"
@@ -99,34 +101,8 @@ def exec_local_command(command, asynch=False):
         return 1, None, "No such file"
 
 
-def is_node_installed():
-    rv, out, err = exec_local_command(f"{npm} -v")
-    return rv == 0 and not err
-
-
-def is_paperspace_installed():
-    rv, out, err = exec_local_command(f"{npm} ls -g paperspace-node")
-    return rv == 0 and not err
-
-
-def install_paperspace():
-    info("Installing paperspace-node ...")
-    rv, out, err = exec_local_command(f"{npm} i -g paperspace-node")
-    if rv != 0:
-        print(err)
-    return rv == 0 and not err
-
-
 def fail(param):
     raise RuntimeError(param)
-
-
-def ensure_paperspace_installed():
-    if not is_node_installed():
-        fail("NodeJS not installed")
-    if not is_paperspace_installed():
-        if not install_paperspace():
-            fail("paperspace-node could not be installed")
 
 
 def create(config_file, content):
@@ -135,27 +111,16 @@ def create(config_file, content):
         dump(content, pconfig)
 
 
-def ensure_paperspace_logged_in(api_key):
-    ensure_paperspace_installed()
-    config_file = Path.home() / '.paperspace' / 'config.json'
-    if not config_file.is_file():
-        if not api_key:
-            fail("Not logged in to Paperspace and no API key given")
-        create(config_file, {"apiKey": api_key, "name": "remoteplay"})
-    info(f"Logged in to Paperspace")
-
-
 def ensure_paperspace_started(api_key, machine_id):
-    ensure_paperspace_logged_in(api_key)
     info(f"Starting machine {machine_id}")
-    for cmd in "start", "waitfor":
-        if not exec_local_command(f'{paperspace} machines {cmd} --machineId {machine_id} --state ready'):
-            fail("Could not start Paperspace machine")
+    start_machine(api_key, machine_id)
+    # give Steam time to start up, otherwise starting the steam app will block indefinitely
+    sleep(15)
 
 
 def build_command(game, ptf):
     if ptf == 'steam':
-        return f'"C:\\Program Files (x86)\\Steam\\steam.exe" steam://rungameid/{game}'
+        return f'C:\\Progra~2\\Steam\\steam.exe steam://rungameid/{game}'
     elif ptf == 'gog':
         return f"\"C:\\Program Files (x86)\\GOG Galaxy\\gog.exe\" /gameId={game} /command=runGame"
     elif ptf == 'origin':
@@ -173,13 +138,9 @@ def execute_remote_command(client, command, host, port=22, identity_file=None):
 
 
 def get_paperspace_machine(api_key, machine):
-    ensure_paperspace_logged_in(api_key)
-    rv, out, err = exec_local_command(f"{paperspace} machines list")
-    if rv != 0:
-        fail(err)
-    p = loads(out)
+    p = list_machines(api_key)
     m = next((x for x in p if x["id"] == machine or x["name"] == machine))
-    return m["id"], m["publicIpAddress"]
+    return m["id"], m["publicIp"]
 
 
 def get_platform_command(command):
@@ -191,14 +152,16 @@ def get_platform_command(command):
 def start_remote_desktop():
     rv, out, err = exec_local_command(get_platform_command("parsecd"), asynch=True)
     if rv != 0:
-        error(err, file=stderr)
+        error(err)
         fail("Could not start Parsec client")
 
 
 def run_remote_game(config):
     log.setLevel(loglevels.get(config["log_level"], INFO))
     client = create_ssh_client()
-    api_key = config["paperspace_apikey"] if "paperspace_apikey" in config else None
+    if not "paperspace_apikey" in config:
+        fail("Paperspace API key not given")
+    api_key = config["paperspace_apikey"] 
     machine_id, host = get_paperspace_machine(api_key, config["machine"])
     ensure_paperspace_started(api_key, machine_id)
     command = build_command(config['game'], config["platform"])
@@ -210,12 +173,10 @@ def run_remote_game(config):
     start_remote_desktop()
 
 
-paperspace = get_platform_command("paperspace")
-npm = get_platform_command("npm")
-
 
 def main():
     run_remote_game(get_config())
+
 
 if __name__ == '__main__':
     main()
