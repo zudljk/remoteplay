@@ -1,7 +1,10 @@
 import argparse
+import socket
+import select
+import sys
 import platform
 from subprocess import Popen, run, PIPE
-from json import dump, loads
+from json import dump
 from os.path import expanduser
 from pathlib import Path
 from sys import stderr
@@ -9,12 +12,14 @@ from sys import executable
 from re import search
 from logging import getLogger, error, ERROR, warn, WARNING, debug, DEBUG, info, INFO
 from time import sleep
+import signal
+
+from threading import Thread
 
 from paramiko import SSHClient, Transport, AutoAddPolicy, RSAKey
 from paramiko.ssh_exception import AuthenticationException
 
-from .forward import forward_tunnel
-from .paperspace import list_machines, start_machine
+from .paperspace import list_machines, start_machine, stop_machine
 
 log = getLogger("root")
 
@@ -37,6 +42,8 @@ commands = {
     }
 }
 
+
+
 def create_ssh_client():
     client = SSHClient()
     client.load_system_host_keys()
@@ -45,14 +52,49 @@ def create_ssh_client():
 
 
 def create_ssh_transport(host, port):
-    transport = Transport(host, port)
-    # transport.
+    transport = Transport((host, port))
     return transport
 
 
-def open_tunnel(localport, host, port, transport):
-    transport.connect()
-    forward_tunnel(localport, host, port, transport)
+def open_tunnel(localport, host, port, client):
+    def handler(chan, host, port):
+        sock = socket.socket()
+        try:
+            sock.connect((host, port))
+        except Exception as e:
+            print("Forwarding request to %s:%d failed: %r" % (host, port, e))
+            return
+
+        while True:
+            r, w, x = select.select([sock, chan], [], [])
+            if sock in r:
+                data = sock.recv(1024)
+                if len(data) == 0:
+                    break
+                chan.send(data)
+            if chan in r:
+                data = chan.recv(1024)
+                if len(data) == 0:
+                    break
+                sock.send(data)
+        chan.close()
+        sock.close()
+
+    def accept_connections(localport, host, port, client):
+        transport = client.get_transport()
+        transport.request_port_forward("", localport)
+        while True:
+            chan = transport.accept(1000)
+            if chan is None:
+                continue
+            thr = Thread(target=handler, args=(chan, host, port))
+            thr.daemon = True
+            thr.start()
+    
+    acceptor = Thread(target=accept_connections, args=(localport, host, port, client))
+    acceptor.daemon = True
+    acceptor.start()
+
 
 
 def version():
@@ -118,6 +160,11 @@ def ensure_paperspace_started(api_key, machine_id):
     sleep(15)
 
 
+def ensure_paperspace_stopped(api_key, machine_id):
+    info(f"Stopping machine {machine_id}")
+    stop_machine(api_key, machine_id)
+
+
 def build_command(game, ptf):
     if ptf == 'steam':
         return f'C:\\Progra~2\\Steam\\steam.exe steam://rungameid/{game}'
@@ -165,13 +212,26 @@ def run_remote_game(config):
     machine_id, host = get_paperspace_machine(api_key, config["machine"])
     ensure_paperspace_started(api_key, machine_id)
     command = build_command(config['game'], config["platform"])
-    # open_tunnel(7575, host, 7575, create_ssh_transport(host, ))
+
+    def clean_up(sig, frame):
+        info('Exiting ...')
+        ensure_paperspace_stopped(api_key, machine_id)
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, clean_up)
+    signal.signal(signal.SIGTERM, clean_up)
+
     try:
         execute_remote_command(client, command, host, identity_file=expanduser(config['identity']))
+        start_remote_desktop()
+        print("Press Ctrl+C to close SSH tunnel")
+        open_tunnel(7575, "localhost", 7575, client)
+        while True:
+            sleep(0.1)
     except AuthenticationException:
         error("Login to remote machine failed: Not authorized", file=stderr)
-    start_remote_desktop()
-
+    except KeyboardInterrupt:
+        clean_up(None, None)
 
 
 def main():

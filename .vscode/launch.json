@@ -11,7 +11,7 @@
             "module": "remoteplay.__init__",
             "args": ["--log-level","debug","-p","steam","-m","Arcturus","-a","6877b8e3692ea32bb20eb07cc3767a","359320"],
             "console": "integratedTerminal",
-            "justMyCode": true
+            "justMyCode": false
         }
     ]
 }
