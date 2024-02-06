@@ -6,6 +6,7 @@ import platform
 from subprocess import Popen, run, PIPE
 from json import dump
 from os.path import expanduser
+from os import getlogin
 from pathlib import Path
 from sys import stderr
 from sys import executable
@@ -18,6 +19,7 @@ from threading import Thread
 
 from paramiko import SSHClient, Transport, AutoAddPolicy, RSAKey
 from paramiko.ssh_exception import AuthenticationException
+from paramiko.config import SSHConfig
 
 from .paperspace import list_machines, start_machine, stop_machine
 
@@ -113,8 +115,8 @@ def get_config():
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--version", action="version", version=version())
     parser.add_argument("--log-level", help="Set log level", default="info")
-    parser.add_argument("-p", "--platform", required=True, choices=["steam", "gog", "origin"],
-                        help="Platform (steam, gog, or origin)")
+    parser.add_argument("-p", "--platform", choices=["steam", "gog", "origin"], default="steam",
+                        help="Platform (steam (default), gog, or origin)")
     parser.add_argument("-m", "--machine", required=True,
                         help="Paperspace Core machine (ID or name) to start the game on")
     parser.add_argument("-a", "--paperspace-apikey", help="Paperspace API key")
@@ -166,7 +168,9 @@ def ensure_paperspace_stopped(api_key, machine_id):
 
 
 def build_command(game, ptf):
-    if ptf == 'steam':
+    if game.startswith("steam://"):
+        return f'C:\\Progra~2\\Steam\\steam.exe {game}'
+    elif ptf == 'steam':
         return f'C:\\Progra~2\\Steam\\steam.exe steam://rungameid/{game}'
     elif ptf == 'gog':
         return f"\"C:\\Program Files (x86)\\GOG Galaxy\\gog.exe\" /gameId={game} /command=runGame"
@@ -176,9 +180,9 @@ def build_command(game, ptf):
         fail(f"Platform {ptf} not supported")
 
 
-def execute_remote_command(client, command, host, port=22, identity_file=None):
-    key = RSAKey.from_private_key_file(identity_file)
-    client.connect(host, port, pkey=key)
+def execute_remote_command(client, command, host, user, port=22, identity_file=None):
+    key = RSAKey.from_private_key_file(identity_file)    
+    client.connect(hostname=host, port=port, username=user, pkey=key)
     debug(f"Executing remote command: {command}")
     stdin, stdout, stderr = client.exec_command(command)
     return stdout.channel.recv_exit_status()
@@ -221,15 +225,26 @@ def run_remote_game(config):
     signal.signal(signal.SIGINT, clean_up)
     signal.signal(signal.SIGTERM, clean_up)
 
+    identity_file = config.get("identity")
+    user = getlogin()
+    ssh_config = SSHConfig.from_path(Path.home() / '.ssh' / 'config')
+    if ssh_config:
+        host_config = ssh_config.lookup(host)
+        if host_config:
+            if host_config.get("identity_file"):
+                identity_file = expanduser(host_config.get("identityfile"))
+            if host_config.get("user"):
+                user = host_config.get("user")
+
     try:
-        execute_remote_command(client, command, host, identity_file=expanduser(config['identity']))
+        execute_remote_command(client, command, host, user, identity_file=identity_file)
         start_remote_desktop()
         print("Press Ctrl+C to close SSH tunnel")
         open_tunnel(7575, "localhost", 7575, client)
         while True:
             sleep(0.1)
     except AuthenticationException:
-        error("Login to remote machine failed: Not authorized", file=stderr)
+        error("Login to remote machine failed: Not authorized")
     except KeyboardInterrupt:
         clean_up(None, None)
 
