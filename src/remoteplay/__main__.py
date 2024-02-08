@@ -23,6 +23,8 @@ from paramiko.config import SSHConfig
 
 from .paperspace import list_machines, start_machine, stop_machine
 
+VERSION = '0.0.20'
+
 log = getLogger("root")
 
 loglevels = {
@@ -98,22 +100,11 @@ def open_tunnel(localport, host, port, client):
     acceptor.start()
 
 
-
-def version():
-    rc, out, err = exec_local_command(f'{executable} -m pip show remoteplay')
-    if rc != 0:
-        fail(err)
-    m = search("Version: ([0-9.]+)", out)
-    if not m:
-        return "unknown"
-    return m.group(1)
-
-
 def get_config():
     default_id = Path.home() / '.ssh' / 'id_rsa'
     parser = argparse.ArgumentParser(description="Run a remote game on a Paperspace instance",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--version", action="version", version=version())
+    parser.add_argument("--version", action="version", version=VERSION)
     parser.add_argument("--log-level", help="Set log level", default="info")
     parser.add_argument("-p", "--platform", choices=["steam", "gog", "origin"], default="steam",
                         help="Platform (steam (default), gog, or origin)")

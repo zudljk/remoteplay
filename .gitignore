@@ -2,3 +2,4 @@ build
 dist
 remoteplay.egg-info
 src/remoteplay/__pycache__
+*.spec
