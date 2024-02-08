@@ -7,6 +7,7 @@ from subprocess import Popen, run, PIPE
 from json import dump
 from os.path import expanduser
 from os import getlogin
+from os import path
 from pathlib import Path
 from sys import stderr
 from sys import executable
@@ -218,14 +219,16 @@ def run_remote_game(config):
 
     identity_file = config.get("identity")
     user = getlogin()
-    ssh_config = SSHConfig.from_path(Path.home() / '.ssh' / 'config')
-    if ssh_config:
-        host_config = ssh_config.lookup(host)
-        if host_config:
-            if host_config.get("identity_file"):
-                identity_file = expanduser(host_config.get("identityfile"))
-            if host_config.get("user"):
-                user = host_config.get("user")
+    ssh_config_file = Path.home() / '.ssh' / 'config'
+    if path.exists(ssh_config_file):
+        ssh_config = SSHConfig.from_path(Path.home() / '.ssh' / 'config')
+        if ssh_config:
+            host_config = ssh_config.lookup(host)
+            if host_config:
+                if host_config.get("identity_file"):
+                    identity_file = expanduser(host_config.get("identityfile"))
+                if host_config.get("user"):
+                    user = host_config.get("user")
 
     try:
         execute_remote_command(client, command, host, user, identity_file=identity_file)
