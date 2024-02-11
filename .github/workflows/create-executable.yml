@@ -44,7 +44,7 @@ jobs:
 
     - name: Set version
       id: version
-      run: echo "::set-output name=version::$(python src/remoteplay-runner.py --version)"
+      run: echo "::set-output name=version::$(grep ^VERSION src/remoteplay/__main__.py | cut -d \' -f 2)"
 
     - name: Create Release
       id: create_release
@@ -70,7 +70,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ needs.create_release.outputs.upload_url }}
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./remoteplay.exe  # Replace with the path to your PyInstaller artifact
         asset_name: remoteplay.exe
         asset_content_type: application/octet-stream
