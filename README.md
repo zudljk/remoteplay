@@ -20,6 +20,7 @@ On your paperspace account you need
   * Select "Team Settings"
   * Select "API Keys"
   * Enter a name for the key and click "Create"
+* A public IP address for your machine.
 
 On your Paperspace machine, you need:
 * Windows 10 or higher
@@ -81,6 +82,20 @@ Then, it will open an SSH connection to run the game on the remote machine.
 After that, it will start the Parsec client so you can connect to the desktop of your remote machine.
 
 Once you close the running `remoteplay` instance by pressing Ctrl+C in the application window, the application will close the SSH connection and shut down the remote machine.
+
+## SSH connection
+
+For the SSH connection, `remoteplay` respects the settings in `{user home}/.ssh/config`.
+
+If you want to connect to your remote machine with a different username than your local username, or use a special identity file, you can specify it in this file. Example:
+
+```
+Host remote-gaming
+   User remoteuser
+   IdentityFile C:\\Users\\me\\.ssh\\id_remotegaming
+```
+
+**Note: The name after `Host` must be the name, the ID or the permanent public IP of your Paperspace machine, not any actual host- and domain name you may have given your remote machine. This has to do with the way `remoteplay` finds the entry in the config file. Ideally, you set here the same name that you give to the `-m` parameter.**
 
 ## USB redirection
 
