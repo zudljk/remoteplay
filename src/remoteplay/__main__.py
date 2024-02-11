@@ -6,7 +6,7 @@ import platform
 from subprocess import Popen, run, PIPE
 from json import dump
 from os.path import expanduser
-from os import getlogin
+from getpass import getuser
 from os import path
 from pathlib import Path
 from sys import stderr
@@ -199,6 +199,16 @@ def start_remote_desktop():
         fail("Could not start Parsec client")
 
 
+def get_credentials(ssh_config, host):
+    if host in ssh_config.get_hostnames():
+        host_config = ssh_config.lookup(host)
+        identity_file = [ expanduser(x) for x in host_config.get("identityfile")][0]
+        user = host_config.get("user")
+        return user, identity_file
+    return None, None
+
+# Steam game ID is in STEAM_ROOT/steamapps/appmanifest_ID.acf
+# GOG game ID can be fetched via API: https://embed.gog.com/games/ajax/filtered?mediaType=game&search=Witcher%203
 def run_remote_game(config):
     log.setLevel(loglevels.get(config["log_level"], INFO))
     client = create_ssh_client()
@@ -218,17 +228,18 @@ def run_remote_game(config):
     signal.signal(signal.SIGTERM, clean_up)
 
     identity_file = config.get("identity")
-    user = getlogin()
+    user = getuser()
     ssh_config_file = Path.home() / '.ssh' / 'config'
     if path.exists(ssh_config_file):
         ssh_config = SSHConfig.from_path(Path.home() / '.ssh' / 'config')
         if ssh_config:
-            host_config = ssh_config.lookup(host)
-            if host_config:
-                if host_config.get("identity_file"):
-                    identity_file = expanduser(host_config.get("identityfile"))
-                if host_config.get("user"):
-                    user = host_config.get("user")
+            user, identity_file = get_credentials(ssh_config, config['machine'])
+            if user is None and identity_file is None:
+                user, identity_file = get_credentials(ssh_config, host)
+            if user is None:
+                user = getuser()
+            if identity_file is None:
+                identity_file = config.get("identity")
 
     try:
         execute_remote_command(client, command, host, user, identity_file=identity_file)
