@@ -63,6 +63,9 @@ jobs:
         name: executable
         path: ./remoteplay.exe
 
+    - name: Debug
+      run: ls -l
+
     - name: Upload Release Asset
       id: upload-release-asset
       uses: actions/upload-release-asset@v1
