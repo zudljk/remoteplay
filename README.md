@@ -34,6 +34,7 @@ On your local machine you need
 
 * The Parsec app, logged in to your Parsec account
 * VirtualHere Remote USB server (optional)
+* Python 3.10 or higher (only on macOS and Linux)
 
 ## Third-party software
 
@@ -45,6 +46,22 @@ On your local machine you need
 
 * Steam, GOG Galaxy and EA (formerly Origin) are game store clients supplied by the games' distributors.
 
+## Installation
+
+### Windows
+
+Download the latest .exe file from https://github.com/zudljk/remoteplay/releases and save it in a convenient location.
+To run the application from the command line, that location needs to be in your PATH environment variable.
+
+### MacOS / Linux
+
+Install the script using `pip`:
+
+```
+python -m pip install git+https://github.com/zudljk/remoteplay.git
+```
+
+You may need to replace `python` with the name of the executable on your system; sometimes it's called `python3`.
 
 ## Usage
 

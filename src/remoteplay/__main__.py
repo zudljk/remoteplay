@@ -24,7 +24,7 @@ from paramiko.config import SSHConfig
 
 from .paperspace import list_machines, start_machine, stop_machine
 
-VERSION = '0.0.22'
+VERSION = '0.0.23'
 
 log = getLogger("root")
 
@@ -38,12 +38,13 @@ loglevels = {
 
 commands = {
     "Windows": {
-        "npm": "npm.cmd", 
-        "paperspace": "paperspace.cmd", 
         "parsecd": Path("C:/", "Program Files", "Parsec", "parsecd.exe")
     },
     "Darwin": {
         "parsecd": Path("/Applications") / "Parsec.app" / "Contents" / "MacOS" / "parsecd"
+    },
+    "Linux": {
+        "parsecd": Path("parsecd")
     }
 }
 
