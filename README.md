@@ -55,14 +55,15 @@ remoteplay.exe [options] GAME_ID
 
 The following options are supported:
 
-| Short option | Long option | Description |
-| -- | -- | -- |
-| -h  | --help | Show a help message and exit |
-|  | --version | Print the version and exit |
-| -p PLATFORM| | Try to start the game via the given PLATFORM. Supported values are `steam`, `gog` and `origin`. If not given, try to guess the option from the given game ID (like `steam://rungameid/..`). If that fails, use `steam`. |
-| -m MACHINE | --machine MACHINE | Use the given MACHINE name; must be a valid Paperspace machine name or ID |
-| -a PAPERSPACE_APIKEY | | Use the given PAPERSPACE_APIKEY as the API key to access your Paperspace account (see above) |
-| | --steam-apikey | (currently not used) |
+| Short option | Long option | Required | Description |
+| -- | -- | -- | -- |
+| -h  | --help | no | Show a help message and exit |
+|  | --version | no | Print the version and exit |
+| -p PLATFORM| | no | Try to start the game via the given PLATFORM. Supported values are `steam`, `gog` and `origin`. If not given, try to guess the option from the given game ID (like `steam://rungameid/..`). If that fails, use `steam`. |
+| -m MACHINE | --machine MACHINE | yes | Use the given MACHINE name; must be a valid Paperspace machine name or ID |
+| -a PAPERSPACE_APIKEY | | yes | Use the given PAPERSPACE_APIKEY as the API key to access your Paperspace account (see above). |
+| | --steam-apikey | no | (currently not used) |
+| | --log-level | no | Output detailed logging messages. Supported values: `debug`, `info` (default), `warn`, `error` |
 
 The GAME_ID is the platform-specific ID of the game.
 

@@ -111,7 +111,7 @@ def get_config():
                         help="Platform (steam (default), gog, or origin)")
     parser.add_argument("-m", "--machine", required=True,
                         help="Paperspace Core machine (ID or name) to start the game on")
-    parser.add_argument("-a", "--paperspace-apikey", help="Paperspace API key")
+    parser.add_argument("-a", "--paperspace-apikey", required=True, help="Paperspace API key")
     parser.add_argument("--steam-apikey", help="Steam API key (required if starting a Steam game by name)")
     parser.add_argument("game", help="Game name or ID")
     args = parser.parse_args()
@@ -211,8 +211,6 @@ def get_credentials(ssh_config, host):
 def run_remote_game(config):
     log.setLevel(loglevels.get(config["log_level"], INFO))
     client = create_ssh_client()
-    if "paperspace_apikey" not in config:
-        fail("Paperspace API key not given")
     api_key = config["paperspace_apikey"] 
     machine_id, host = get_paperspace_machine(api_key, config["machine"])
     ensure_paperspace_started(api_key, machine_id)
