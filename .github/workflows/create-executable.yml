@@ -56,7 +56,6 @@ jobs:
         release_name: ${{steps.version.outputs.version}}
         draft: false
         prerelease: false
-        body_path: CHANGELOG.md
 
     - name: Unsave artifact
       uses: actions/download-artifact@master
