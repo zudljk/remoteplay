@@ -24,7 +24,7 @@ from paramiko.config import SSHConfig
 
 from .paperspace import list_machines, start_machine, stop_machine
 
-VERSION = '0.0.20'
+VERSION = '0.0.21'
 
 log = getLogger("root")
 
@@ -113,7 +113,6 @@ def get_config():
                         help="Paperspace Core machine (ID or name) to start the game on")
     parser.add_argument("-a", "--paperspace-apikey", help="Paperspace API key")
     parser.add_argument("--steam-apikey", help="Steam API key (required if starting a Steam game by name)")
-    parser.add_argument("-i", "--identity", help="Override identity file for SSH", default=f"{default_id}")
     parser.add_argument("game", help="Game name or ID")
     args = parser.parse_args()
     return vars(args)
@@ -212,7 +211,7 @@ def get_credentials(ssh_config, host):
 def run_remote_game(config):
     log.setLevel(loglevels.get(config["log_level"], INFO))
     client = create_ssh_client()
-    if not "paperspace_apikey" in config:
+    if "paperspace_apikey" not in config:
         fail("Paperspace API key not given")
     api_key = config["paperspace_apikey"] 
     machine_id, host = get_paperspace_machine(api_key, config["machine"])
@@ -227,7 +226,6 @@ def run_remote_game(config):
     signal.signal(signal.SIGINT, clean_up)
     signal.signal(signal.SIGTERM, clean_up)
 
-    identity_file = config.get("identity")
     user = getuser()
     ssh_config_file = Path.home() / '.ssh' / 'config'
     if path.exists(ssh_config_file):
