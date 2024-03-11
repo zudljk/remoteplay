@@ -22,7 +22,7 @@ from paramiko import SSHClient, Transport, AutoAddPolicy, RSAKey
 from paramiko.ssh_exception import AuthenticationException
 from paramiko.config import SSHConfig
 
-from paperspace import list_machines, start_machine, stop_machine
+from remoteplay.paperspace import list_machines, start_machine, stop_machine
 
 VERSION = '0.0.24'
 

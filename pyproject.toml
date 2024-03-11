@@ -28,4 +28,4 @@ dependencies = [
 "Bug Tracker" = "https://github.com/zudljk/remoteplay/issues"
 
 [project.scripts]
-remoteplay = "remoteplay:main"
+remoteplay = "remoteplay.__main__:main"
