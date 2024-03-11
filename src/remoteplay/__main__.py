@@ -22,7 +22,7 @@ from paramiko import SSHClient, Transport, AutoAddPolicy, RSAKey
 from paramiko.ssh_exception import AuthenticationException
 from paramiko.config import SSHConfig
 
-from .paperspace import list_machines, start_machine, stop_machine
+from paperspace import list_machines, start_machine, stop_machine
 
 VERSION = '0.0.23'
 
@@ -228,7 +228,7 @@ def run_remote_game(config):
     user = getuser()
     ssh_config_file = Path.home() / '.ssh' / 'config'
     if path.exists(ssh_config_file):
-        ssh_config = SSHConfig.from_path(Path.home() / '.ssh' / 'config')
+        ssh_config = SSHConfig.from_path(ssh_config_file)
         if ssh_config:
             user, identity_file = get_credentials(ssh_config, config['machine'])
             if user is None and identity_file is None:
