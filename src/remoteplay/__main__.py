@@ -24,7 +24,7 @@ from paramiko.config import SSHConfig
 
 from paperspace import list_machines, start_machine, stop_machine
 
-VERSION = '0.0.23'
+VERSION = '0.0.24'
 
 log = getLogger("root")
 
