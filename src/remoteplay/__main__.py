@@ -9,10 +9,7 @@ from os.path import expanduser
 from getpass import getuser
 from os import path
 from pathlib import Path
-from sys import stderr
-from sys import executable
-from re import search
-from logging import getLogger, error, ERROR, warn, WARNING, debug, DEBUG, info, INFO
+from logging import getLogger, error, ERROR, WARNING, debug, DEBUG, info, INFO
 from time import sleep
 import signal
 
@@ -24,7 +21,7 @@ from paramiko.config import SSHConfig
 
 from remoteplay.paperspace import list_machines, start_machine, stop_machine
 
-VERSION = '0.0.24'
+VERSION = '0.1.2'
 
 log = getLogger("root")
 
@@ -38,13 +35,16 @@ loglevels = {
 
 commands = {
     "Windows": {
-        "parsecd": Path("C:/", "Program Files", "Parsec", "parsecd.exe")
+        "parsecd": Path("C:/", "Program Files", "Parsec", "parsecd.exe"),
+        "virtualhere": Path("C:/", "Program Files", "VirtualHere", "vhusbdwin64.exe")
     },
     "Darwin": {
-        "parsecd": Path("/Applications") / "Parsec.app" / "Contents" / "MacOS" / "parsecd"
+        "parsecd": Path("/Applications") / "Parsec.app" / "Contents" / "MacOS" / "parsecd",
+        "virtualhere": Path("/Applications") / "VirtualHereServerUniversal.app" / "Contents" / "MacOS" / "vhusbdosx"
     },
     "Linux": {
-        "parsecd": Path("parsecd")
+        "parsecd": Path("parsecd"),
+        "virtualhere": Path("vhusbx86")
     }
 }
 
@@ -103,18 +103,13 @@ def open_tunnel(localport, host, port, client):
 
 
 def get_config():
-    default_id = Path.home() / '.ssh' / 'id_rsa'
     parser = argparse.ArgumentParser(description="Run a remote game on a Paperspace instance",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--version", action="version", version=VERSION)
     parser.add_argument("--log-level", help="Set log level", default="info")
-    parser.add_argument("-p", "--platform", choices=["steam", "gog", "origin"], default="steam",
-                        help="Platform (steam (default), gog, or origin)")
     parser.add_argument("-m", "--machine", required=True,
                         help="Paperspace Core machine (ID or name) to start the game on")
     parser.add_argument("-a", "--paperspace-apikey", required=True, help="Paperspace API key")
-    parser.add_argument("--steam-apikey", help="Steam API key (required if starting a Steam game by name)")
-    parser.add_argument("game", help="Game name or ID")
     args = parser.parse_args()
     return vars(args)
 
@@ -150,35 +145,19 @@ def create(config_file, content):
 def ensure_paperspace_started(api_key, machine_id):
     info(f"Starting machine {machine_id}")
     start_machine(api_key, machine_id)
-    # give Steam time to start up, otherwise starting the steam app will block indefinitely
-    sleep(15)
+    # give Steam time to start up
+    sleep(20)
 
 
 def ensure_paperspace_stopped(api_key, machine_id):
     info(f"Stopping machine {machine_id}")
-    stop_machine(api_key, machine_id)
-
-
-def build_command(game, ptf):
-    if game.startswith("steam://"):
-        return f'C:\\Progra~2\\Steam\\steam.exe {game}'
-    elif ptf == 'steam':
-        return f'C:\\Progra~2\\Steam\\steam.exe steam://rungameid/{game}'
-    elif ptf == 'gog':
-        return f"\"C:\\Program Files (x86)\\GOG Galaxy\\gog.exe\" /gameId={game} /command=runGame"
-    elif ptf == 'origin':
-        return f"\"C:\\Program Files (x86)\\Origin Games\\{game}\""
-    else:
-        fail(f"Platform {ptf} not supported")
-
-
-def execute_remote_command(client, command, host, user, port=22, identity_file=None):
+    stop_machine(api_key, machine_id, wait=True)
+    
+    
+def connect_remote_host(client, host, user, port=22, identity_file=None):
     key = RSAKey.from_private_key_file(identity_file)    
     client.connect(hostname=host, port=port, username=user, pkey=key)
-    debug(f"Executing remote command: {command}")
-    stdin, stdout, stderr = client.exec_command(command)
-    return stdout.channel.recv_exit_status()
-
+    
 
 def get_paperspace_machine(api_key, machine):
     p = list_machines(api_key)
@@ -192,11 +171,11 @@ def get_platform_command(command):
     fail(f"Platform {platform.system()} not supported yet")
 
 
-def start_remote_desktop():
-    rv, out, err = exec_local_command(get_platform_command("parsecd"), asynch=True)
+def start_usb_server():
+    rv, out, err = exec_local_command(get_platform_command("virtualhere"), asynch=True)
     if rv != 0:
         error(err)
-        fail("Could not start Parsec client")
+        fail("Could not start VirtualHere server")
 
 
 def get_credentials(ssh_config, host):
@@ -207,6 +186,7 @@ def get_credentials(ssh_config, host):
         return user, identity_file
     return None, None
 
+
 # Steam game ID is in STEAM_ROOT/steamapps/appmanifest_ID.acf
 # GOG game ID can be fetched via API: https://embed.gog.com/games/ajax/filtered?mediaType=game&search=Witcher%203
 def run_remote_game(config):
@@ -215,7 +195,6 @@ def run_remote_game(config):
     api_key = config["paperspace_apikey"] 
     machine_id, host = get_paperspace_machine(api_key, config["machine"])
     ensure_paperspace_started(api_key, machine_id)
-    command = build_command(config['game'], config["platform"])
 
     def clean_up(sig, frame):
         info('Exiting ...')
@@ -239,8 +218,8 @@ def run_remote_game(config):
                 identity_file = config.get("identity")
 
     try:
-        execute_remote_command(client, command, host, user, identity_file=identity_file)
-        start_remote_desktop()
+        start_usb_server()
+        connect_remote_host(client, host, user, identity_file=identity_file)
         print("Press Ctrl+C to close SSH tunnel")
         open_tunnel(7575, "localhost", 7575, client)
         while True:
