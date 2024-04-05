@@ -112,3 +112,6 @@ On the remote machine, you'll have to download and install the VirtualHere clien
 Then you will be able to use your local USB device on the remote machine.
 
 _Note that this is not necessary for mouse and keyboard, since they are supported by Steam Link out of the box._
+
+_Note also that the remote VirtualHere USB client will show a confirmation dialog before connecting to your local server, which means you will have to remote-desktop into the remote host and click on confirm to be able to use USB redirection. You can avoid this by using the Windows service version of the USB client, but this won't work with
+the free version of the server._ 
