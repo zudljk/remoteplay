@@ -3,10 +3,7 @@ from os import args
 PAPERSPACE_API=https://api.paperspace.com/v1
 MACHINE_NAME=args[0]
 API_KEY=args[1]
-MACHINE_ID=None
 SSH_PROCESS=None
-PUBLIC_IP=None
-HOST=None
 
 # Function to retrieve the public IP of the Paperspace machine
 def get_machine(machine):
@@ -211,7 +208,7 @@ class MainWindow(QMainWindow):
     def start_updating(self):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update)
-        self.timer.start(5000)  # Update every 10 seconds
+        self.timer.start(5000)  # Update every 5 seconds
         self.update()
         
 
