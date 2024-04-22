@@ -18,9 +18,9 @@ classifiers = [
 ]
 dependencies = [
     'paramiko',
-    'python-steam-api',
     'beautifulsoup4',
-    'pyinstaller'
+    'pyinstaller',
+    'PyQt5'
 ]
 
 [project.urls]

@@ -5,8 +5,9 @@ name = "pip_conf_index_global"
 
 [packages]
 paramiko = "*"
-python-steam-api = "*"
 beautifulsoup4 = "*"
+pyqt5 = "*"
+psutil = "*"
 
 [dev-packages]
 
