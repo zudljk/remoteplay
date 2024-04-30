@@ -3,7 +3,6 @@ import os
 import configparser
 import sys
 from json import loads
-from sys import argv
 from time import sleep
 from re import compile
 
@@ -21,6 +20,7 @@ API_KEY = None
 SSH_PROCESS = None
 MACHINES = None
 
+VERSION = '0.2.3'
 
 # Function to retrieve the public IP of the Paperspace machine
 def get_machine(machine):
@@ -268,7 +268,8 @@ class MainWindow(QMainWindow):
             tunnel("open", self.current_state[self.connect_by]())
 
     def retranslate_ui(self):
-        self.setWindowTitle(u"Remote machine")
+        global VERSION
+        self.setWindowTitle(u"RemotePlay v"+VERSION)
         self.top.setTitle(u"Paperspace parameters")
         self.paperspace_key_label.setText(u"Paperspace API key")
         self.machine_name_label.setText(u"Machine name")

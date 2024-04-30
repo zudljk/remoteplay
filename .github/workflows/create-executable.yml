@@ -30,12 +30,6 @@ jobs:
     - name: Install go-msi
       run: choco install -y "go-msi"
 
-    - name: debug
-      run: dir
-
-    - name: fix
-      run: copy wix.json application
-
     - name: cleanup
       run: Remove-Item -Path .\build -Recurse -Force
 
@@ -43,6 +37,9 @@ jobs:
       uses: AliceOh/CreateWindowsInstaller@1.0.0
       with:
         exefile: ./dist/remoteplay.exe
+
+    - name: fix artifact name
+      run: Rename-Item -Path .\dist\remoteplay.exe.msi -NewName remoteplay.msi
 
     - name: Save artifact
       uses: actions/upload-artifact@master
