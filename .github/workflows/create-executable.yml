@@ -34,7 +34,7 @@ jobs:
       run: dir
 
     - name: cleanup
-      run: rendir build _build
+      run: Remove-Item -Path .\build -Recurse -Force
 
     - name: Build Windows Installer MSI from exe file
       uses: AliceOh/CreateWindowsInstaller@1.0.0
