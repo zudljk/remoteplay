@@ -7,7 +7,7 @@ on:
   workflow_dispatch:  # Manually trigger workflow
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
 
     steps:
@@ -30,11 +30,49 @@ jobs:
     - name: Save artifact
       uses: actions/upload-artifact@master
       with:
-        name: executable
+        name: win-exe
         path: ./dist/remoteplay.exe
 
+  build-macos:
+    runs-on: macos-12
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.11
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install .
+
+    - name: Build with PyInstaller
+      run: python src/remoteplay-runner.py --create-executable
+
+    - name: Clean output dir
+      run: rm -rf dist/remoteplay
+
+    - name: Add readme
+      run: cp README.md dist
+
+    - name: Create DMG
+      run: hdiutil create -format UDZO -ov -volname RemotePlay -srcfolder dist RemotePlay.dmg
+
+    - name: Save artifact
+      uses: actions/upload-artifact@master
+      with:
+        name: mac-app
+        path: ./RemotePlay.dmg
+
   create_release:
-    needs: build  # Wait for the build job to complete
+    # Wait for the build job to complete
+    needs:
+      - build-windows
+      - build-macos
     runs-on: ubuntu-latest  # Use Ubuntu to trigger manual steps
     if: github.event_name == 'workflow_dispatch'
     steps:
@@ -44,7 +82,7 @@ jobs:
 
     - name: Set version
       id: version
-      run: echo "::set-output name=version::$(grep ^VERSION src/remoteplay/__main__.py | cut -d \' -f 2)"
+      run: echo "::set-output name=version::$(grep ^version pyproject.toml | cut -d \" -f 2)"
 
     - name: Create Release
       id: create_release
@@ -57,17 +95,23 @@ jobs:
         draft: false
         prerelease: false
 
-    - name: Unsave artifact
+    - name: Unsave windows artifact
       uses: actions/download-artifact@master
       with:
-        name: executable
+        name: win-exe
+        path: ./dist
+
+    - name: Unsave mac artifact
+      uses: actions/download-artifact@master
+      with:
+        name: mac-app
         path: ./dist
 
     - name: Debug
       run: ls -l dist
 
-    - name: Upload Release Asset
-      id: upload-release-asset
+    - name: Upload Windows Release Asset
+      id: upload-windows-release-asset
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -75,4 +119,15 @@ jobs:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./dist/remoteplay.exe
         asset_name: remoteplay.exe
+        asset_content_type: application/octet-stream
+
+    - name: Upload macOS Release Asset
+      id: upload-macos-release-asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./dist/RemotePlay.dmg
+        asset_name: RemotePlay.dmg
         asset_content_type: application/octet-stream

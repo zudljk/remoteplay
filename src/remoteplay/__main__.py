@@ -1,240 +1,437 @@
-import argparse
-import socket
-import select
+import subprocess
+import os
+import configparser
 import sys
-import platform
-from subprocess import Popen, run, PIPE
-from json import dump
-from os.path import expanduser
-from getpass import getuser
-from os import path
-from pathlib import Path
-from logging import getLogger, error, ERROR, WARNING, debug, DEBUG, info, INFO
+from json import loads
+from sys import argv
 from time import sleep
-import signal
+from re import compile
 
-from threading import Thread
+import psutil
+import requests
+from PyQt5.QtCore import pyqtSignal, QObject, QThread, QTimer, QRect, Qt
+from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QLabel, QLineEdit, QPushButton, QApplication, QWidget, \
+    QGridLayout, QGroupBox, QComboBox
 
-from paramiko import SSHClient, Transport, AutoAddPolicy, RSAKey
-from paramiko.ssh_exception import AuthenticationException
-from paramiko.config import SSHConfig
+BACKGROUND_GRAY = "background-color: darkgray;"
+BACKGROUND_GREEN = "background-color: green;"
 
-from remoteplay.paperspace import list_machines, start_machine, stop_machine
-
-VERSION = '0.1.2'
-
-log = getLogger("root")
-
-loglevels = {
-    "error": ERROR,
-    "warn": WARNING,
-    "warning": WARNING,
-    "info": INFO,
-    "debug": DEBUG
-}
-
-commands = {
-    "Windows": {
-        "parsecd": Path("C:/", "Program Files", "Parsec", "parsecd.exe"),
-        "virtualhere": Path("C:/", "Program Files", "VirtualHere", "vhusbdwin64.exe")
-    },
-    "Darwin": {
-        "parsecd": Path("/Applications") / "Parsec.app" / "Contents" / "MacOS" / "parsecd",
-        "virtualhere": Path("/Applications") / "VirtualHereServerUniversal.app" / "Contents" / "MacOS" / "vhusbdosx"
-    },
-    "Linux": {
-        "parsecd": Path("parsecd"),
-        "virtualhere": Path("vhusbx86")
-    }
-}
+PAPERSPACE_API = "https://api.paperspace.com/v1"
+API_KEY = None
+SSH_PROCESS = None
+MACHINES = None
 
 
-
-def create_ssh_client():
-    client = SSHClient()
-    client.load_system_host_keys()
-    client.set_missing_host_key_policy(AutoAddPolicy)
-    return client
-
-
-def create_ssh_transport(host, port):
-    transport = Transport((host, port))
-    return transport
-
-
-def open_tunnel(localport, host, port, client):
-    def handler(chan, host, port):
-        sock = socket.socket()
-        try:
-            sock.connect((host, port))
-        except Exception as e:
-            print("Forwarding request to %s:%d failed: %r" % (host, port, e))
-            return
-
-        while True:
-            r, w, x = select.select([sock, chan], [], [])
-            if sock in r:
-                data = sock.recv(1024)
-                if len(data) == 0:
-                    break
-                chan.send(data)
-            if chan in r:
-                data = chan.recv(1024)
-                if len(data) == 0:
-                    break
-                sock.send(data)
-        chan.close()
-        sock.close()
-
-    def accept_connections(localport, host, port, client):
-        transport = client.get_transport()
-        transport.request_port_forward("", localport)
-        while True:
-            chan = transport.accept(1000)
-            if chan is None:
-                continue
-            thr = Thread(target=handler, args=(chan, host, port))
-            thr.daemon = True
-            thr.start()
-    
-    acceptor = Thread(target=accept_connections, args=(localport, host, port, client))
-    acceptor.daemon = True
-    acceptor.start()
-
-
-def get_config():
-    parser = argparse.ArgumentParser(description="Run a remote game on a Paperspace instance",
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--version", action="version", version=VERSION)
-    parser.add_argument("--log-level", help="Set log level", default="info")
-    parser.add_argument("-m", "--machine", required=True,
-                        help="Paperspace Core machine (ID or name) to start the game on")
-    parser.add_argument("-a", "--paperspace-apikey", required=True, help="Paperspace API key")
-    args = parser.parse_args()
-    return vars(args)
-
-
-def exec_local_command(command, asynch=False):
-    debug(f"Running command: {command}")
+# Function to retrieve the public IP of the Paperspace machine
+def get_machine(machine):
     try:
-        if asynch:
-            Popen(str(command).split())
-            return 0, "", ""
-        a = run(str(command).split(), stdout=PIPE, stderr=PIPE)
-        rc = a.returncode
-        out = a.stdout.decode('utf-8')
-        err = a.stderr.decode('utf-8')
-        debug(out)
-        if err and log.getEffectiveLevel() == DEBUG:
-            error(err)
-        return rc, out, err
-    except FileNotFoundError:
-        return 1, None, "No such file"
+        m = next((x for x in MACHINES if x["id"] == machine or x["name"] == machine))
+        return m["id"], m["publicIp"]
+    except StopIteration:
+        return None, None
 
 
-def fail(param):
-    raise RuntimeError(param)
+def get_machines():
+    global MACHINES
+    if MACHINES is None:
+        MACHINES = request_get("")["items"]
 
 
-def create(config_file, content):
-    config_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(config_file.absolute(), "w", encoding='utf8') as pconfig:
-        dump(content, pconfig)
+def request_get(path):
+    response = requests.get(f"{PAPERSPACE_API}/machines/{path}", headers={
+        "accept": "application/json",
+        "authorization": f"Bearer {API_KEY}"
+    })
+    return loads(response.text)
 
 
-def ensure_paperspace_started(api_key, machine_id):
-    info(f"Starting machine {machine_id}")
-    start_machine(api_key, machine_id)
-    # give Steam time to start up
-    sleep(20)
+def request_patch(path):
+    response = requests.patch(f"{PAPERSPACE_API}/machines/{path}", headers={
+        "accept": "application/json",
+        "authorization": f"Bearer {API_KEY}"
+    })
+    return loads(response.text)
 
 
-def ensure_paperspace_stopped(api_key, machine_id):
-    info(f"Stopping machine {machine_id}")
-    stop_machine(api_key, machine_id, wait=True)
-    
-    
-def connect_remote_host(client, host, user, port=22, identity_file=None):
-    key = RSAKey.from_private_key_file(identity_file)    
-    client.connect(hostname=host, port=port, username=user, pkey=key)
-    
-
-def get_paperspace_machine(api_key, machine):
-    p = list_machines(api_key)
-    m = next((x for x in p if x["id"] == machine or x["name"] == machine))
-    return m["id"], m["publicIp"]
+def change_machine_status(machine_id, command, target_state, status_callback):
+    state = check_state(machine_id)
+    if state != target_state:
+        request_patch(f"{machine_id}/{command}")
+        wait_for_state(machine_id, target_state, status_callback)
 
 
-def get_platform_command(command):
-    if platform.system() in commands:
-        return commands.get(platform.system()).get(command, command)
-    fail(f"Platform {platform.system()} not supported yet")
+def wait_for_state(machine_id, target_state, status_callback):
+    state = check_state(machine_id)
+    while state != target_state:
+        sleep(5)
+        state = check_state(machine_id)
+        status_callback(state)
 
 
-def start_usb_server():
-    rv, out, err = exec_local_command(get_platform_command("virtualhere"), asynch=True)
-    if rv != 0:
-        error(err)
-        fail("Could not start VirtualHere server")
+# Function to stop the Paperspace machine
+def stop_machine(machine_id, status_callback):
+    tunnel("close")
+    status_callback("shutdown requested")
+    change_machine_status(machine_id, "stop", "off", status_callback)
 
 
-def get_credentials(ssh_config, host):
-    if host in ssh_config.get_hostnames():
-        host_config = ssh_config.lookup(host)
-        identity_file = [ expanduser(x) for x in host_config.get("identityfile")][0]
-        user = host_config.get("user")
-        return user, identity_file
-    return None, None
+def tunnel(action, host_id=None):
+    global SSH_PROCESS
+    if action == "open" and host_id and not isinstance(SSH_PROCESS, subprocess.Popen):
+        SSH_PROCESS = subprocess.Popen(
+            ["ssh", "-N", "-R", "7575:localhost:7575", "-o", "StrictHostKeyChecking=no", host_id])
+    elif action == "close" and isinstance(SSH_PROCESS, subprocess.Popen):
+        SSH_PROCESS.terminate()
+    elif action == "check":
+        if not SSH_PROCESS:
+            return "closed"
+        returncode = SSH_PROCESS.poll()
+        if returncode is None:
+            return "open"
+        elif returncode > 0:
+            return "error"
+        else:
+            return "closed"
 
 
-# Steam game ID is in STEAM_ROOT/steamapps/appmanifest_ID.acf
-# GOG game ID can be fetched via API: https://embed.gog.com/games/ajax/filtered?mediaType=game&search=Witcher%203
-def run_remote_game(config):
-    log.setLevel(loglevels.get(config["log_level"], INFO))
-    client = create_ssh_client()
-    api_key = config["paperspace_apikey"] 
-    machine_id, host = get_paperspace_machine(api_key, config["machine"])
-    ensure_paperspace_started(api_key, machine_id)
+def start_usbserver():
+    if check_process("vhusb") != "active":
+        subprocess.Popen("/Applications/VirtualHereServerUniversal.app/Contents/MacOS/vhusbdosx")
 
-    def clean_up(sig, frame):
-        info('Exiting ...')
-        ensure_paperspace_stopped(api_key, machine_id)
-        sys.exit(0)
 
-    signal.signal(signal.SIGINT, clean_up)
-    signal.signal(signal.SIGTERM, clean_up)
+def determine_host_name(**args):
+    # try to find a "Host" entry in ~/.ssh/config to determine the host name
+    for type, id in args.items():
+        process = subprocess.Popen(["ssh", "-G", id], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        for line in process.stdout:
+            l = line.strip()
+            if l.lower().startswith('hostname'):
+                return type, l.split()[1]
+    # if not found, return the first argument that looks like an IPv4 or IPv6 address
+    ip = compile("([0-2][0-9][0-9]\\.?){4}|[0-9:]+")
+    for id in args.values():
+        if ip.match(id):
+            return id
+    # if none found, return none
+    return None
 
-    user = getuser()
-    ssh_config_file = Path.home() / '.ssh' / 'config'
-    if path.exists(ssh_config_file):
-        ssh_config = SSHConfig.from_path(ssh_config_file)
-        if ssh_config:
-            user, identity_file = get_credentials(ssh_config, config['machine'])
-            if user is None and identity_file is None:
-                user, identity_file = get_credentials(ssh_config, host)
-            if user is None:
-                user = getuser()
-            if identity_file is None:
-                identity_file = config.get("identity")
 
-    try:
-        start_usb_server()
-        connect_remote_host(client, host, user, identity_file=identity_file)
-        print("Press Ctrl+C to close SSH tunnel")
-        open_tunnel(7575, "localhost", 7575, client)
-        while True:
-            sleep(0.1)
-    except AuthenticationException:
-        error("Login to remote machine failed: Not authorized")
-    except KeyboardInterrupt:
-        clean_up(None, None)
+def check_process(process_name):
+    for proc in psutil.process_iter(['name']):
+        if process_name in proc.info['name']:
+            return "active"
+    return "inactive"
+
+
+# Function to check the state of the Paperspace machine
+def check_state(machine_id):
+    return request_get(machine_id)["state"] if machine_id else "unknown"
+
+
+class ChangeMachineStatus(QObject):
+    finished = pyqtSignal()
+    status = pyqtSignal(str)
+
+    def __init__(self, machine_id):
+        super().__init__()
+        self.machine_id = machine_id
+        self.action = "start"
+        self.target_state = "ready"
+
+    def stop(self):
+        self.action = "stop"
+        self.target_state = "off"
+
+    def run(self):
+        def callback(state):
+            self.status.emit(state)
+
+        change_machine_status(self.machine_id, self.action, self.target_state, callback)
+        self.finished.emit()
+
+
+class MainWindow(QMainWindow):
+
+    def __init__(self):
+        super().__init__()
+        self.machine_name = None
+        self.machine_id = None
+        self.public_ip = None
+        self.connect_by = "machine_name"
+        self.hostname = None
+        self.machine_state = None
+        self.load_config()
+        self.current_state = {
+            "machine_id": (lambda: self.machine_id),
+            "machine_name": (lambda: self.machine_name),
+            "hostname": (lambda: self.hostname),
+            "public_ip": (lambda: self.public_ip),
+            "usb_server": (lambda: check_process("vhusb")),
+            "machine_state": (lambda: self.machine_state),
+            "ssh_tunnel": (lambda: tunnel("check", self.current_state[self.connect_by]()))
+        }
+
+        self.resize(420, 600)
+        self.centralwidget = QWidget()
+        self.verticalLayoutWidget = QWidget(self.centralwidget)
+        self.verticalLayoutWidget.setGeometry(QRect(10, 10, 400, 550))
+
+        self.all_layout = QVBoxLayout(self.verticalLayoutWidget)
+        self.all_layout.setContentsMargins(0, 0, 0, 0)
+
+        # ------- Box for API key and machine name -----
+        self.top = QGroupBox(self.verticalLayoutWidget)
+        self.top_layout_widget = QWidget(self.top)
+        self.top_grid_layout = QGridLayout(self.top_layout_widget)
+        self.top_grid_layout.setContentsMargins(0, 0, 0, 0)
+        self.paperspace_key_label = QLabel(self.top_layout_widget)
+        self.top_grid_layout.addWidget(self.paperspace_key_label, 0, 0, 1, 1)
+        self.paperspace_key_text = QLineEdit(self.top_layout_widget)
+        self.paperspace_key_text.setText(API_KEY)
+        self.paperspace_key_text.editingFinished.connect(self.init_paperspace_values)
+        self.top_grid_layout.addWidget(self.paperspace_key_text, 0, 2, 1, 1)
+        self.machine_name_label = QLabel(self.top_layout_widget)
+        self.top_grid_layout.addWidget(self.machine_name_label, 2, 0, 1, 1)
+        self.machine_name_text = QComboBox(self.top_layout_widget)
+        self.machine_name_text.setEditable(False)
+        self.machine_name_text.setCurrentText(self.machine_name)
+        self.machine_name_text.currentIndexChanged.connect(self.init_paperspace_values)
+        self.top_grid_layout.addWidget(self.machine_name_text, 2, 2, 1, 1)
+        self.top_grid_layout.setColumnMinimumWidth(0, 100)
+        self.top_layout_widget.setGeometry(QRect(20, 40, 360, 120))
+        self.top.setFixedHeight(160)
+
+        self.upper = QGroupBox(self.verticalLayoutWidget)
+        self.gridLayoutWidget = QWidget(self.upper)
+        self.upper_grid_layout = QGridLayout(self.gridLayoutWidget)
+        self.upper_grid_layout.setContentsMargins(0, 0, 0, 0)
+        self.machine_id_label = QLabel(self.gridLayoutWidget)
+        self.upper_grid_layout.addWidget(self.machine_id_label, 0, 0, 1, 1)
+        self.machine_id_text = QLineEdit(self.gridLayoutWidget)
+        self.machine_id_text.setReadOnly(True)
+        self.upper_grid_layout.addWidget(self.machine_id_text, 0, 2, 1, 1)
+        self.host_name_label = QLabel(self.gridLayoutWidget)
+        self.upper_grid_layout.addWidget(self.host_name_label, 2, 0, 1, 1)
+        self.host_name_text = QLineEdit(self.gridLayoutWidget)
+        self.host_name_text.setReadOnly(True)
+        self.upper_grid_layout.addWidget(self.host_name_text, 2, 2, 1, 1)
+        self.public_ip_label = QLabel(self.gridLayoutWidget)
+        self.upper_grid_layout.addWidget(self.public_ip_label, 3, 0, 1, 1)
+        self.public_ip_text = QLineEdit(self.gridLayoutWidget)
+        self.public_ip_text.setReadOnly(True)
+        self.upper_grid_layout.addWidget(self.public_ip_text, 3, 2, 1, 1)
+        self.upper_grid_layout.setColumnMinimumWidth(0, 120)
+        self.gridLayoutWidget.setGeometry(QRect(20, 40, 360, 120))
+
+        self.lower = QGroupBox(self.verticalLayoutWidget)
+        self.gridLayoutWidget_2 = QWidget(self.lower)
+        self.lower_grid_layout = QGridLayout(self.gridLayoutWidget_2)
+        self.lower_grid_layout.setContentsMargins(0, 0, 0, 0)
+        self.gridLayoutWidget_2.setGeometry(QRect(20, 40, 360, 120))
+
+        self.usb_server_bar = QLineEdit(self.gridLayoutWidget_2)
+        self.usb_server_bar.setStyleSheet(BACKGROUND_GRAY)
+        self.usb_server_bar.setAlignment(Qt.AlignCenter)
+        self.usb_server_bar.setReadOnly(True)
+        self.lower_grid_layout.addWidget(self.usb_server_bar, 0, 1, 1, 1)
+
+        self.machine_state_bar = QLineEdit(self.gridLayoutWidget_2)
+        self.machine_state_bar.setStyleSheet(BACKGROUND_GRAY)
+        self.machine_state_bar.setAlignment(Qt.AlignCenter)
+        self.machine_state_bar.setReadOnly(True)
+        self.lower_grid_layout.addWidget(self.machine_state_bar, 2, 1, 1, 1)
+
+        self.usb_server_label = QLabel(self.gridLayoutWidget_2)
+        self.lower_grid_layout.addWidget(self.usb_server_label, 0, 0, 1, 1)
+        self.machine_state_label = QLabel(self.gridLayoutWidget_2)
+        self.lower_grid_layout.addWidget(self.machine_state_label, 2, 0, 1, 1)
+        self.ssh_tunnel_label = QLabel(self.gridLayoutWidget_2)
+        self.lower_grid_layout.addWidget(self.ssh_tunnel_label, 3, 0, 1, 1)
+
+        self.ssh_tunnel_bar = QLineEdit(self.gridLayoutWidget_2)
+        self.ssh_tunnel_bar.setAlignment(Qt.AlignCenter)
+        self.ssh_tunnel_bar.setStyleSheet(BACKGROUND_GRAY)
+        self.ssh_tunnel_bar.setReadOnly(True)
+        self.lower_grid_layout.addWidget(self.ssh_tunnel_bar, 3, 1, 1, 1)
+        self.lower_grid_layout.setColumnMinimumWidth(0, 120)
+
+        self.all_layout.addWidget(self.top)
+        self.all_layout.addWidget(self.upper)
+        self.all_layout.addWidget(self.lower)
+        self.button = QPushButton(self.verticalLayoutWidget)
+        self.all_layout.addWidget(self.button)
+        self.setCentralWidget(self.centralwidget)
+        self.retranslate_ui()
+        self.init_paperspace_values()
+
+        if self.current_state["machine_state"]() == 'ready':
+            tunnel("open", self.current_state[self.connect_by]())
+
+    def retranslate_ui(self):
+        self.setWindowTitle(u"Remote machine")
+        self.top.setTitle(u"Paperspace parameters")
+        self.paperspace_key_label.setText(u"Paperspace API key")
+        self.machine_name_label.setText(u"Machine name")
+        self.upper.setTitle(u"Paperspace machine info")
+        self.host_name_label.setText(u"Host name")
+        self.machine_id_label.setText(u"Machine ID")
+        self.public_ip_label.setText(u"Public IP")
+        self.lower.setTitle(u"Service status")
+        self.usb_server_label.setText(u"USB Server")
+        self.machine_state_label.setText(u"Machine state")
+        self.ssh_tunnel_label.setText(u"SSH Tunnel")
+        self.button.setText(u"Start remote")
+
+    def init_paperspace_values(self):
+        global API_KEY
+        API_KEY = self.paperspace_key_text.text()
+        if API_KEY is not None and len(API_KEY) > 0 and self.machine_name_text.count() == 0:
+            get_machines()
+            self.machine_name_text.currentIndexChanged.disconnect()
+            self.machine_name_text.addItems([m["name"] for m in MACHINES])
+            self.machine_name_text.setCurrentText(self.machine_name)
+            self.machine_name_text.currentIndexChanged.connect(self.init_paperspace_values)
+        self.machine_name = self.machine_name_text.currentText()
+        if self.machine_name is not None and len(self.machine_name) > 0 and API_KEY is not None and len(API_KEY) > 0:
+            self.machine_id, self.public_ip = get_machine(self.machine_name)
+            if self.machine_id:
+                self.connect_by, self.hostname = determine_host_name(
+                    machine_name=self.machine_name, machine_id=self.machine_id, public_ip=self.public_ip)
+                self.machine_state = check_state(self.machine_id)
+                self.save_config()
+                self.update_data()
+                self.set_up_button()
+                self.start_updating()
+
+    def save_config(self):
+        global API_KEY
+        home_dir = os.path.expanduser("~")
+        if os.name == 'posix':  # Linux and macOS
+            config_dir = os.path.join(home_dir, ".remoteplay")
+        elif os.name == 'nt':  # Windows
+            config_dir = os.path.join(os.getenv('APPDATA'), 'remoteplay')
+        else:
+            raise OSError("Unsupported operating system")
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+        config = configparser.ConfigParser()
+        config['REMOTE_PLAY'] = {'machine_name': self.machine_name, 'api_key': API_KEY}
+        with open(os.path.join(config_dir, 'config.ini'), 'w') as configfile:
+            config.write(configfile)
+
+    def load_config(self):
+        global API_KEY
+        home_dir = os.path.expanduser("~")
+        if os.name == 'posix':  # Linux and macOS
+            config_dir = os.path.join(home_dir, ".remoteplay")
+        elif os.name == 'nt':  # Windows
+            config_dir = os.path.join(os.getenv('APPDATA'), 'remoteplay')
+        else:
+            raise OSError("Unsupported operating system")
+        if os.path.exists(config_dir):
+            config_file_path = os.path.join(config_dir, 'config.ini')
+            if os.path.exists(config_file_path):
+                config = configparser.ConfigParser()
+                config.read(config_file_path)
+                if 'REMOTE_PLAY' in config:
+                    self.machine_name = config['REMOTE_PLAY'].get('machine_name')
+                    API_KEY = config['REMOTE_PLAY'].get('api_key')
+
+    def set_up_button(self):
+        if self.machine_state == "ready":
+            self.button.setText("Stop remote")
+            self.button.clicked.connect((lambda: self.start_stop_machine("stop")))
+            self.button.setEnabled(True)
+        elif self.machine_state == "off":
+            self.button.setText("Start remote")
+            self.button.clicked.connect((lambda: self.start_stop_machine("start")))
+            self.button.setEnabled(True)
+        else:
+            self.button.setText("Please wait")
+            self.button.setEnabled(False)
+
+    def start_stop_machine(self, action):
+        self.stop_updating()
+        self.button.setEnabled(False)
+        self.thread = QThread()
+        self.worker = ChangeMachineStatus(self.machine_id)
+        if action == "stop":
+            self.worker.stop()
+            tunnel("close")
+        else:
+            start_usbserver()
+        self.worker.moveToThread(self.thread)
+
+        self.thread.started.connect(self.worker.run)
+        self.thread.finished.connect(self.thread.deleteLater)
+
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.status_change_complete)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.worker.status.connect(self.update_state)
+        self.thread.start()
+
+    def status_change_complete(self):
+        state = self.current_state["machine_state"]()
+        self.current_state["machine_state"] = (lambda: check_state(self.machine_id))
+        self.set_up_button()
+        self.start_updating()
+        if state == 'ready':
+            tunnel("open", self.current_state[self.connect_by]())
+
+    def update_state(self, state):
+        self.machine_state = state
+        self.update_data()
+
+    def start_updating(self):
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_data)
+        self.timer.start(5000)  # Update every 5 seconds
+        self.update_data()
+
+    def update_data(self):
+        self.machine_id_text.setText(self.current_state.get("machine_id", (lambda: None))())
+        self.machine_name_text.setCurrentText(self.current_state.get("machine_name", (lambda: None))())
+        self.host_name_text.setText(self.current_state.get("hostname", (lambda: None))())
+        self.public_ip_text.setText(self.current_state.get("public_ip", (lambda: None))())
+        lmd = self.current_state.get("usb_server")
+        self.usb_server_bar.setText(lmd())
+        match lmd():
+            case "inactive":
+                self.usb_server_bar.setStyleSheet(BACKGROUND_GRAY)
+            case "active":
+                self.usb_server_bar.setStyleSheet(BACKGROUND_GREEN)
+        lmd = self.current_state.get("ssh_tunnel")
+        self.ssh_tunnel_bar.setText(lmd())
+        match lmd():
+            case "closed":
+                self.ssh_tunnel_bar.setStyleSheet(BACKGROUND_GRAY)
+            case "error":
+                self.ssh_tunnel_bar.setStyleSheet("background-color: red;")
+            case "open":
+                self.ssh_tunnel_bar.setStyleSheet(BACKGROUND_GREEN)
+        lmd = self.current_state.get("machine_state")
+        self.machine_state_bar.setText(lmd())
+        match lmd():
+            case "off":
+                self.machine_state_bar.setStyleSheet(BACKGROUND_GRAY)
+            case "starting":
+                self.machine_state_bar.setStyleSheet("background-color: yellow;")
+            case "stopping":
+                self.machine_state_bar.setStyleSheet("background-color: yellow;")
+            case "ready":
+                self.machine_state_bar.setStyleSheet(BACKGROUND_GREEN)
+
+    def stop_updating(self):
+        self.timer.stop()
 
 
 def main():
-    run_remote_game(get_config())
+    app = QApplication(sys.argv)
+    main_window = MainWindow()
+    main_window.show()
+    sys.exit(app.exec_())
 
 
 if __name__ == '__main__':
     main()
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/

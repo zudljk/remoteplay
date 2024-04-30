@@ -4,10 +4,9 @@ verify_ssl = true
 name = "pip_conf_index_global"
 
 [packages]
-paramiko = "*"
-beautifulsoup4 = "*"
 pyqt5 = "*"
 psutil = "*"
+pyinstaller = "*"
 
 [dev-packages]
 
