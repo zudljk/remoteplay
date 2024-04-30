@@ -45,7 +45,7 @@ jobs:
       uses: actions/upload-artifact@master
       with:
         name: win-exe
-        path: ./dist/remoteplay.exe.msi
+        path: ./dist/remoteplay.msi
 
   build-macos:
     runs-on: macos-12
@@ -131,8 +131,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./dist/remoteplay.exe.msi
-        asset_name: remoteplay.exe.msi
+        asset_path: ./dist/remoteplay.msi
+        asset_name: remoteplay.msi
         asset_content_type: application/octet-stream
 
     - name: Upload macOS Release Asset
