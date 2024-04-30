@@ -27,11 +27,22 @@ jobs:
     - name: Build with PyInstaller
       run: python src/remoteplay-runner.py --create-executable
 
+    - name: Install go-msi
+      run: choco install -y "go-msi"
+
+    - name: Build Windows Installer MSI from exe file
+      uses: AliceOh/CreateWindowsInstaller@1.0.0
+      with:
+        exefile: ./dist/remoteplay.exe
+
+    - name: debug
+      run: dir dist
+
     - name: Save artifact
       uses: actions/upload-artifact@master
       with:
         name: win-exe
-        path: ./dist/remoteplay.exe
+        path: ./dist/remoteplay.exe.msi
 
   build-macos:
     runs-on: macos-12
@@ -117,8 +128,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./dist/remoteplay.exe
-        asset_name: remoteplay.exe
+        asset_path: ./dist/remoteplay.exe.msi
+        asset_name: remoteplay.exe.msi
         asset_content_type: application/octet-stream
 
     - name: Upload macOS Release Asset

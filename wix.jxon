@@ -1,0 +1,43 @@
+{
+  "product": "RemotePlay",
+  "company": "zudljk",
+  "license": "MIT",
+  "upgrade-code": "",
+  "files": {
+    "guid": "",
+    "items": [
+      "dist/remoteplay.exe"
+    ]
+  },
+  "env": {
+    "guid": "",
+    "vars": [
+      {
+        "name": "PATH",
+        "value": "[INSTALLDIR]",
+        "permanent": "no",
+        "system": "no",
+        "action": "set",
+        "part": "last"
+      }
+    ]
+  },
+  "shortcuts": {
+    "guid": "",
+    "items": [
+      {
+        "name": "RemotePlay MSI",
+        "description": "MSI package for RemotePlay",
+        "target": "[INSTALLDIR]\\remoteplay.exe",
+        "wdir": "INSTALLDIR",
+        "arguments": "",
+        "icon": ""
+      }
+    ]
+  },
+  "choco": {
+    "description": "generate MSI package for RemotePlay project",
+    "tags": "RemotePlay",
+    "license-url": "https://opensource.org/licenses/MIT"
+  }
+}
