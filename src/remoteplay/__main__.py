@@ -20,7 +20,7 @@ API_KEY = None
 SSH_PROCESS = None
 MACHINES = None
 
-VERSION = '0.2.3'
+VERSION = '0.2.4'
 
 # Function to retrieve the public IP of the Paperspace machine
 def get_machine(machine):
