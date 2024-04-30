@@ -30,14 +30,13 @@ jobs:
     - name: Install go-msi
       run: choco install -y "go-msi"
 
-    - name: Build Windows Installer MSI from exe file
-      uses: AliceOh/CreateWindowsInstaller@1.0.0
-      working-directory: dist
-      with:
-        exefile: remoteplay.exe
-
     - name: debug
       run: dir dist
+
+    - name: Build Windows Installer MSI from exe file
+      uses: AliceOh/CreateWindowsInstaller@1.0.0
+      with:
+        exefile: ./dist/remoteplay.exe
 
     - name: Save artifact
       uses: actions/upload-artifact@master
