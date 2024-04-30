@@ -30,6 +30,9 @@ jobs:
     - name: Install go-msi
       run: choco install -y "go-msi"
 
+    - name: Cleanup
+      run: rmdir /s build
+
     - name: Build Windows Installer MSI from exe file
       uses: AliceOh/CreateWindowsInstaller@1.0.0
       with:
