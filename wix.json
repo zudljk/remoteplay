@@ -6,7 +6,7 @@
   "files": {
     "guid": "",
     "items": [
-      "dist/remoteplay.exe"
+      "application/remoteplay.exe"
     ]
   },
   "env": {
