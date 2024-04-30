@@ -17,7 +17,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    'paramiko',
+    'psutil',
     'beautifulsoup4',
     'pyinstaller',
     'PyQt5'
