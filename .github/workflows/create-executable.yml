@@ -30,13 +30,11 @@ jobs:
     - name: Install go-msi
       run: choco install -y "go-msi"
 
-    - name: Cleanup
-      run: rmdir /s build
-
     - name: Build Windows Installer MSI from exe file
       uses: AliceOh/CreateWindowsInstaller@1.0.0
+      working-directory: dist
       with:
-        exefile: ./dist/remoteplay.exe
+        exefile: remoteplay.exe
 
     - name: debug
       run: dir dist
