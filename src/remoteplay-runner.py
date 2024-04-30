@@ -10,7 +10,8 @@ if len(argv) > 1 and argv[1] == '--create-executable':
     if system() == 'Darwin':  # Linux and macOS
         PyInstaller.__main__.run([__file__, '--windowed', '--name', 'remoteplay', '--exclude-module', 'PyInstaller'])
     elif system() == 'Windows':  # Windows
-        PyInstaller.__main__.run([__file__, '--windowed', '--onefile', '--name', 'remoteplay', '--exclude-module', 'PyInstaller'])
+        PyInstaller.__main__.run([__file__, '--windowed', '--onefile', '--name', 'remoteplay', '--distpath',
+                                  'application', '--exclude-module', 'PyInstaller'])
     else:
         PyInstaller.__main__.run([__file__, '--onefile', '--name', 'remoteplay', '--exclude-module', 'PyInstaller'])
 elif __name__ == '__main__':
