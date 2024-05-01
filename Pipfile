@@ -7,8 +7,9 @@ name = "pip_conf_index_global"
 pyqt5 = "*"
 psutil = "*"
 pyinstaller = "*"
+requests = "*"
 
 [dev-packages]
 
 [requires]
-python_version = "3.11"
+python_version = "3.12"

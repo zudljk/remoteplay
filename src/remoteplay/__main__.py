@@ -5,12 +5,13 @@ import sys
 from json import loads
 from time import sleep
 from re import compile
+from platform import system
 
 import psutil
 import requests
 from PyQt5.QtCore import pyqtSignal, QObject, QThread, QTimer, QRect, Qt
 from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QLabel, QLineEdit, QPushButton, QApplication, QWidget, \
-    QGridLayout, QGroupBox, QComboBox
+    QGridLayout, QGroupBox, QComboBox, QMessageBox, QMessageBox
 
 BACKGROUND_GRAY = "background-color: darkgray;"
 BACKGROUND_GREEN = "background-color: green;"
@@ -19,6 +20,7 @@ PAPERSPACE_API = "https://api.paperspace.com/v1"
 API_KEY = None
 SSH_PROCESS = None
 MACHINES = None
+VHUSB_PATH = None
 
 VERSION = '0.2.4'
 
@@ -96,7 +98,20 @@ def tunnel(action, host_id=None):
 
 def start_usbserver():
     if check_process("vhusb") != "active":
-        subprocess.Popen("/Applications/VirtualHereServerUniversal.app/Contents/MacOS/vhusbdosx")
+        path = VHUSB_PATH
+        if path is None:
+            if system() == 'Darwin':
+                subprocess.Popen(os.path.join("/", "Applications", "VirtualHereServerUniversal.app", "Contents", "MacOS", "vhusbdosx"))
+            elif system() == 'Windows':
+                import ctypes
+                #ctypes.windll.shell32.ShellExecuteW(None, "runas", 
+                #                                    os.path.join("C:\\", "Program Files", "VirtualHere", "vhusbdwin64.exe"),
+                #                                    "",
+                #                                    None, 1)             
+            else:
+                subprocess.Popen('vhuit64')
+        else:
+            subprocess.Popen(path)
 
 
 def determine_host_name(**args):
@@ -321,7 +336,7 @@ class MainWindow(QMainWindow):
             config.write(configfile)
 
     def load_config(self):
-        global API_KEY
+        global API_KEY, VHUSB_PATH
         home_dir = os.path.expanduser("~")
         if os.name == 'posix':  # Linux and macOS
             config_dir = os.path.join(home_dir, ".remoteplay")
@@ -337,6 +352,7 @@ class MainWindow(QMainWindow):
                 if 'REMOTE_PLAY' in config:
                     self.machine_name = config['REMOTE_PLAY'].get('machine_name')
                     API_KEY = config['REMOTE_PLAY'].get('api_key')
+                    VHUSB_PATH = config['REMOTE_PLAY'].get('vhusb_path')
 
     def set_up_button(self):
         if self.machine_state == "ready":
@@ -352,25 +368,28 @@ class MainWindow(QMainWindow):
             self.button.setEnabled(False)
 
     def start_stop_machine(self, action):
-        self.stop_updating()
-        self.button.setEnabled(False)
-        self.thread = QThread()
-        self.worker = ChangeMachineStatus(self.machine_id)
-        if action == "stop":
-            self.worker.stop()
-            tunnel("close")
-        else:
-            start_usbserver()
-        self.worker.moveToThread(self.thread)
+        try:
+            self.stop_updating()
+            self.button.setEnabled(False)
+            self.thread = QThread()
+            self.worker = ChangeMachineStatus(self.machine_id)
+            if action == "stop":
+                self.worker.stop()
+                tunnel("close")
+            else:
+                start_usbserver()
+            self.worker.moveToThread(self.thread)
 
-        self.thread.started.connect(self.worker.run)
-        self.thread.finished.connect(self.thread.deleteLater)
+            self.thread.started.connect(self.worker.run)
+            self.thread.finished.connect(self.thread.deleteLater)
 
-        self.worker.finished.connect(self.thread.quit)
-        self.worker.finished.connect(self.status_change_complete)
-        self.worker.finished.connect(self.worker.deleteLater)
-        self.worker.status.connect(self.update_state)
-        self.thread.start()
+            self.worker.finished.connect(self.thread.quit)
+            self.worker.finished.connect(self.status_change_complete)
+            self.worker.finished.connect(self.worker.deleteLater)
+            self.worker.status.connect(self.update_state)
+            self.thread.start()
+        except Exception as e:
+            handle_error(e)
 
     def status_change_complete(self):
         state = self.current_state["machine_state"]()
@@ -425,6 +444,21 @@ class MainWindow(QMainWindow):
 
     def stop_updating(self):
         self.timer.stop()
+
+
+def handle_error(e):
+    msg = QMessageBox() 
+    msg.setIcon(QMessageBox.Critical)
+    if hasattr(e, 'message'):
+        msg.setText(e.message)
+    elif hasattr(e, 'strerror'): 
+        msg.setText(e.strerror)       
+    else:
+        msg.setText(repr(e))
+    msg.setWindowTitle("RemotePlay Error") 
+    msg.setStandardButtons(QMessageBox.Ok) 
+    msg.exec_()
+    raise e
 
 
 def main():

@@ -8,9 +8,8 @@
             "name": "Python-Debugger: Aktuelle Datei mit Argumenten",
             "type": "debugpy",
             "request": "launch",
-            "program": "src/remoteplay/__main__.py",
+            "program": "src/remoteplay-runner.py",
             "console": "integratedTerminal",
-            "args": "--log-level debug -m Arcturus -a 6877b8e3692ea32bb20eb07cc3767a",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             }
