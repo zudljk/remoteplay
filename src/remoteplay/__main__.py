@@ -22,7 +22,7 @@ SSH_PROCESS = None
 MACHINES = None
 VHUSB_PATH = None
 
-VERSION = '0.2.4'
+VERSION = '0.2.5'
 
 # Function to retrieve the public IP of the Paperspace machine
 def get_machine(machine):

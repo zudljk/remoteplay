@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "remoteplay"
-version = "0.2.4"
+version = "0.2.5"
 authors = [
-  { name="ZudlJK", email="zudjl@email.de" }
+  { name="ZudlJK", email="zudljk@email.de" }
 ]
 description = "Start a game on a remote system"
 readme = "README.md"
