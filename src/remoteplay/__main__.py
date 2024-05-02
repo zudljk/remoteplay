@@ -43,14 +43,14 @@ def request_patch(path, api_key):
 
 class SshTunnel:
 
-    def __init__(self, host_id):
-        self.host_id = host_id
+    def __init__(self):
+        self.host_provider = (lambda: None)
         self.process = None
 
     def open(self):
-        if self.host_id is not None and not isinstance(self.process, subprocess.Popen):
+        if self.host_provider() is not None and not isinstance(self.process, subprocess.Popen):
             self.process = subprocess.Popen(["ssh", "-N", "-R", "7575:localhost:7575",
-                                              "-o", "StrictHostKeyChecking=no", self.host_id])
+                                              "-o", "StrictHostKeyChecking=no", self.host_provider()])
             
     def close(self):
         self.process.terminate()
@@ -243,8 +243,9 @@ class MainWindow(QMainWindow):
         self.all_layout.addWidget(self.button)
         self.setCentralWidget(self.centralwidget)
         self.retranslate_ui()
+        self.ssh_tunnel = SshTunnel()
         self.init_paperspace_values()
-        self.ssh_tunnel = SshTunnel(self.current_state[self.connect_by]())
+        self.ssh_tunnel.host_provider = self.current_state[self.connect_by]
 
         if self.machine_state == 'ready':
             self.ssh_tunnel.open()
