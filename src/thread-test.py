@@ -114,10 +114,6 @@ class MainWindow(QMainWindow):
         self.top_grid_layout.addWidget(self.paperspace_key_text, 0, 2, 1, 1)
         self.machine_name_label = QLabel(self.top_layout_widget)
         self.top_grid_layout.addWidget(self.machine_name_label, 2, 0, 1, 1)
-        self.machine_name_text = QComboBox(self.top_layout_widget)
-        self.machine_name_text.setEditable(False)
-        self.machine_name_text.setCurrentText(self.machine_name)
-        self.top_grid_layout.addWidget(self.machine_name_text, 2, 2, 1, 1)
         self.top_grid_layout.setColumnMinimumWidth(0, 100)
         self.top_layout_widget.setGeometry(QRect(20, 40, 360, 120))
         self.top.setFixedHeight(160)
@@ -139,8 +135,7 @@ class MainWindow(QMainWindow):
 
     def init_paperspace_values(self):
         self.api_key = self.paperspace_key_text.text()
-        self.machine_name_text.addItem("Arcturus")
-        self.machine_name = self.machine_name_text.currentText()
+        self.machine_name = "Arcturus"
         if self.machine_name is not None and len(self.machine_name) > 0 and self.api_key is not None and len(self.api_key) > 0:
             self.machine_id, self.public_ip = self.get_machine(self.machine_name)
             if self.machine_id:
@@ -175,7 +170,6 @@ class MainWindow(QMainWindow):
         self.thread.start()
 
     def update_data(self):
-        self.machine_name_text.setCurrentText(self.machine_name)
         self.machine_state = check_state(self.machine_id, self.api_key)
 
 
