@@ -84,7 +84,6 @@ class MainWindow(QMainWindow):
         self.hostname = None
         self.machine_state = None
         self.api_key = None
-
         self.load_config()
         self.current_state = {
             "machine_id": (lambda: self.machine_id),
@@ -101,24 +100,6 @@ class MainWindow(QMainWindow):
         self.all_layout = QVBoxLayout(self.verticalLayoutWidget)
         self.all_layout.setContentsMargins(0, 0, 0, 0)
 
-        # ------- Box for API key and machine name -----
-        self.top = QGroupBox(self.verticalLayoutWidget)
-        self.top_layout_widget = QWidget(self.top)
-        self.top_grid_layout = QGridLayout(self.top_layout_widget)
-        self.top_grid_layout.setContentsMargins(0, 0, 0, 0)
-        self.paperspace_key_label = QLabel(self.top_layout_widget)
-        self.top_grid_layout.addWidget(self.paperspace_key_label, 0, 0, 1, 1)
-        self.paperspace_key_text = QLineEdit(self.top_layout_widget)
-        self.paperspace_key_text.setText(self.api_key)
-        self.paperspace_key_text.editingFinished.connect(self.init_paperspace_values)
-        self.top_grid_layout.addWidget(self.paperspace_key_text, 0, 2, 1, 1)
-        self.machine_name_label = QLabel(self.top_layout_widget)
-        self.top_grid_layout.addWidget(self.machine_name_label, 2, 0, 1, 1)
-        self.top_grid_layout.setColumnMinimumWidth(0, 100)
-        self.top_layout_widget.setGeometry(QRect(20, 40, 360, 120))
-        self.top.setFixedHeight(160)
-
-        self.all_layout.addWidget(self.top)
         self.button = QPushButton(self.verticalLayoutWidget)
         self.all_layout.addWidget(self.button)
         self.setCentralWidget(self.centralwidget)
@@ -128,13 +109,10 @@ class MainWindow(QMainWindow):
     def retranslate_ui(self):
         global VERSION
         self.setWindowTitle(u"RemotePlay v"+VERSION)
-        self.top.setTitle(u"Paperspace parameters")
-        self.paperspace_key_label.setText(u"Paperspace API key")
-        self.machine_name_label.setText(u"Machine name")
         self.button.setText(u"Start remote")
 
     def init_paperspace_values(self):
-        self.api_key = self.paperspace_key_text.text()
+        self.api_key = "6877b8e3692ea32bb20eb07cc3767a"
         self.machine_name = "Arcturus"
         if self.machine_name is not None and len(self.machine_name) > 0 and self.api_key is not None and len(self.api_key) > 0:
             self.machine_id, self.public_ip = self.get_machine(self.machine_name)
@@ -170,7 +148,7 @@ class MainWindow(QMainWindow):
         self.thread.start()
 
     def update_data(self):
-        self.machine_state = check_state(self.machine_id, self.api_key)
+        self.machine_state = "off"
 
 
 def handle_error(e):
