@@ -22,7 +22,7 @@ PAPERSPACE_API = "https://api.paperspace.com/v1"
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-VERSION = '0.2.5'
+VERSION = '0.2.6'
 
 
 def check_state(machine_id, api_key):
