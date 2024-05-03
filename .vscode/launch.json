@@ -1,18 +1,15 @@
 {
-    // Verwendet IntelliSense zum Ermitteln möglicher Attribute.
-    // Zeigen Sie auf vorhandene Attribute, um die zugehörigen Beschreibungen anzuzeigen.
-    // Weitere Informationen finden Sie unter https://go.microsoft.com/fwlink/?linkid=830387
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python-Debugger: Aktuelle Datei mit Argumenten",
+            "name": "Python Debugger: Current File",
             "type": "debugpy",
             "request": "launch",
-            "program": "src/remoteplay-runner.py",
-            "console": "integratedTerminal",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            }
+            "program": "${file}",
+            "console": "integratedTerminal"
         }
     ]
 }
