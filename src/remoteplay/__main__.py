@@ -2,6 +2,7 @@ import subprocess
 import os
 import configparser
 import sys
+import logging
 from json import loads
 from time import sleep
 from re import compile
@@ -17,6 +18,8 @@ BACKGROUND_GRAY = "background-color: darkgray;"
 BACKGROUND_GREEN = "background-color: green;"
 
 PAPERSPACE_API = "https://api.paperspace.com/v1"
+
+logger = logging.getLogger(__name__)
 
 VERSION = '0.2.5'
 
@@ -50,18 +53,19 @@ class SshTunnel:
     def open(self):
         if self.host_provider() is not None and not isinstance(self.process, subprocess.Popen):
             self.process = subprocess.Popen(["ssh", "-N", "-R", "7575:localhost:7575",
-                                              "-o", "StrictHostKeyChecking=no", self.host_provider()])
-            
+                                             "-o", "StrictHostKeyChecking=no", self.host_provider()])
+
     def close(self):
-        self.process.terminate()
+        if self.process:
+            self.process.terminate()
 
     def check(self):
         if not self.process:
             return "closed"
-        returncode = self.process.poll()
-        if returncode is None:
+        return_code = self.process.poll()
+        if return_code is None:
             return "open"
-        elif returncode > 0:
+        elif return_code > 0:
             return "error"
         else:
             return "closed"
@@ -76,43 +80,45 @@ class UsbServer:
         if self.get_status() != "active":
             if self.vhusb_path is None:
                 if system() == 'Darwin':
-                    subprocess.Popen(os.path.join("/", "Applications", "VirtualHereServerUniversal.app", "Contents", "MacOS", "vhusbdosx"))
+                    self.vhusb_path = os.path.join("/", "Applications", "VirtualHereServerUniversal.app", "Contents",
+                                                   "MacOS",
+                                                   "vhusbdosx")
+                    subprocess.Popen(self.vhusb_path)
                 elif system() == 'Windows':
-                    import ctypes
-                    #ctypes.windll.shell32.ShellExecuteW(None, "runas", 
-                    #                                    os.path.join("C:\\", "Program Files", "VirtualHere", "vhusbdwin64.exe"),
-                    #                                    "",
-                    #                                    None, 1)             
+                    from ctypes import windll
+                    self.vhusb_path = os.path.join("C:\\", "Program Files", "VirtualHere", "vhusbdwin64.exe")
+                    windll.shell32.ShellExecuteW(None, "runas", self.vhusb_path, "", None, 1)
                 else:
                     subprocess.Popen('vhuit64')
             else:
                 subprocess.Popen(self.vhusb_path)
 
-    def get_status(self):
+    @staticmethod
+    def get_status():
         for proc in psutil.process_iter(['name']):
             if "vhusb" in proc.info['name']:
                 return "active"
         return "inactive"
 
 
-class ChangeMachineStatus(QObject):
-
+class ChangeMachineStatus(QThread):
     finished = pyqtSignal()
     status = pyqtSignal(str)
 
-    def __init__(self, machine_id, api_key):
+    def __init__(self, machine_id, api_key, action):
         super().__init__()
         self.machine_id = machine_id
         self.api_key = api_key
         self.action = "start"
         self.target_state = "ready"
-
-    def stop(self):
-        self.action = "stop"
-        self.target_state = "off"
+        self.action = action
+        if action == "start":
+            self.target_state = "ready"
+        else:
+            self.target_state = "off"
 
     def check_state(self):
-        check_state(self.machine_id, self.api_key)
+        return check_state(self.machine_id, self.api_key)
 
     def wait_for_state(self, target_state, status_callback):
         state = self.check_state()
@@ -124,9 +130,11 @@ class ChangeMachineStatus(QObject):
     def run(self):
         def callback(state):
             self.status.emit(state)
+
         if self.check_state() != self.target_state:
             request_patch(f"{self.machine_id}/{self.action}", self.api_key)
             self.wait_for_state(self.target_state, callback)
+        self.status.emit(self.target_state)
         self.finished.emit()
 
 
@@ -143,7 +151,12 @@ class MainWindow(QMainWindow):
         self.machine_state = None
         self.api_key = None
         self.vhusb_path = None
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.handle_timer)
+
         self.load_config()
+
         self.usb_server = UsbServer(self.vhusb_path)
         self.current_state = {
             "machine_id": (lambda: self.machine_id),
@@ -246,13 +259,11 @@ class MainWindow(QMainWindow):
         self.ssh_tunnel = SshTunnel()
         self.init_paperspace_values()
         self.ssh_tunnel.host_provider = self.current_state[self.connect_by]
-
-        if self.machine_state == 'ready':
-            self.ssh_tunnel.open()
+        self.status_change_complete()
 
     def retranslate_ui(self):
         global VERSION
-        self.setWindowTitle(u"RemotePlay v"+VERSION)
+        self.setWindowTitle(u"RemotePlay v" + VERSION)
         self.top.setTitle(u"Paperspace parameters")
         self.paperspace_key_label.setText(u"Paperspace API key")
         self.machine_name_label.setText(u"Machine name")
@@ -267,6 +278,7 @@ class MainWindow(QMainWindow):
         self.button.setText(u"Start remote")
 
     def init_paperspace_values(self):
+        print("Initializing ...")
         self.api_key = self.paperspace_key_text.text()
         if self.api_key is not None and len(self.api_key) > 0 and self.machine_name_text.count() == 0:
             self.machine_name_text.currentIndexChanged.disconnect()
@@ -274,19 +286,18 @@ class MainWindow(QMainWindow):
             self.machine_name_text.setCurrentText(self.machine_name)
             self.machine_name_text.currentIndexChanged.connect(self.init_paperspace_values)
         self.machine_name = self.machine_name_text.currentText()
-        if self.machine_name is not None and len(self.machine_name) > 0 and self.api_key is not None and len(self.api_key) > 0:
+        if self.machine_name is not None and len(self.machine_name) > 0 and self.api_key is not None and len(
+                self.api_key) > 0:
             self.machine_id, self.public_ip = self.get_machine(self.machine_name)
             if self.machine_id:
                 self.connect_by, self.hostname = self.determine_host_name()
+                self.machine_state = check_state(self.machine_id, self.api_key)
                 self.save_config()
-                self.update_data()
-                self.set_up_button()
-                self.start_updating()
 
     def determine_host_name(self):
-        map = { "machine_name": self.machine_name, "machine_id": self.machine_id, "public_ip": self.public_ip }
+        connectors = {"machine_name": self.machine_name, "machine_id": self.machine_id, "public_ip": self.public_ip}
         # try to find a "Host" entry in ~/.ssh/config to determine the host name
-        for type, id in map.items():
+        for type, id in connectors.items():
             process = subprocess.Popen(["ssh", "-G", id], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             for line in process.stdout:
                 l = line.strip()
@@ -294,7 +305,7 @@ class MainWindow(QMainWindow):
                     return type, l.split()[1]
         # if not found, return the first argument that looks like an IPv4 or IPv6 address
         ip = compile("([0-2][0-9][0-9]\\.?){4}|[0-9:]+")
-        for id in map.values():
+        for id in connectors.values():
             if ip.match(id):
                 return id
         # if none found, return none
@@ -313,6 +324,7 @@ class MainWindow(QMainWindow):
         return self.machines
 
     def save_config(self):
+        print("Saving configuration ...")
         home_dir = os.path.expanduser("~")
         if os.name == 'posix':  # Linux and macOS
             config_dir = os.path.join(home_dir, ".remoteplay")
@@ -324,7 +336,7 @@ class MainWindow(QMainWindow):
             os.makedirs(config_dir)
         config = configparser.ConfigParser()
         config['REMOTE_PLAY'] = {
-            'machine_name': self.machine_name, 
+            'machine_name': self.machine_name,
             'api_key': self.api_key
         }
         if self.vhusb_path:
@@ -333,6 +345,7 @@ class MainWindow(QMainWindow):
             config.write(configfile)
 
     def load_config(self):
+        print("Loading configuration ...")
         home_dir = os.path.expanduser("~")
         if os.name == 'posix':  # Linux and macOS
             config_dir = os.path.join(home_dir, ".remoteplay")
@@ -351,60 +364,80 @@ class MainWindow(QMainWindow):
                     self.vhusb_path = config['REMOTE_PLAY'].get('vhusb_path')
 
     def set_up_button(self):
+
+        try:
+            self.button.clicked.disconnect()
+        except TypeError:
+            pass
+
         if self.machine_state == "ready":
             self.button.setText("Stop remote")
             self.button.clicked.connect((lambda: self.start_stop_machine("stop")))
             self.button.setEnabled(True)
+            self.paperspace_key_text.setReadOnly(False)
         elif self.machine_state == "off":
             self.button.setText("Start remote")
             self.button.clicked.connect((lambda: self.start_stop_machine("start")))
             self.button.setEnabled(True)
+            self.paperspace_key_text.setReadOnly(False)
         else:
             self.button.setText("Please wait")
             self.button.setEnabled(False)
+            self.paperspace_key_text.setReadOnly(True)
 
     def start_stop_machine(self, action):
         try:
+            print(f"{action} requested")
             self.stop_updating()
-            self.button.setEnabled(False)
-            self.thread = QThread()
-            self.worker = ChangeMachineStatus(self.machine_id, self.api_key)
+            try:
+                self.paperspace_key_text.editingFinished.disconnect()
+            except TypeError:
+                pass
             if action == "stop":
-                self.worker.stop()
                 self.ssh_tunnel.close()
+                self.machine_state = "stopping"
             else:
                 self.usb_server.start()
-            self.worker.moveToThread(self.thread)
-
-            self.thread.started.connect(self.worker.run)
+                self.machine_state = "starting"
+            self.set_up_button()
+            self.update_data()
+            self.thread = ChangeMachineStatus(self.machine_id, self.api_key, action)
+            self.thread.finished.connect(self.status_change_complete)
+            self.thread.finished.connect(self.thread.quit)
             self.thread.finished.connect(self.thread.deleteLater)
-
-            self.worker.finished.connect(self.thread.quit)
-            #self.worker.finished.connect(self.status_change_complete)
-            #self.worker.finished.connect(self.worker.deleteLater)
-            #self.worker.status.connect(self.update_state)
+            self.thread.status.connect(self.update_state)
             self.thread.start()
         except Exception as e:
             handle_error(e)
 
     def status_change_complete(self):
-        self.machine_state = check_state(self.machine_id, self.api_key)
-        self.set_up_button()
+        print(f"Target state {self.machine_state} reached")
+        self.thread = None
+        try:
+            self.paperspace_key_text.editingFinished.connect(self.init_paperspace_values)
+        except TypeError:
+            pass
         self.start_updating()
         if self.machine_state == 'ready':
             self.ssh_tunnel.open()
+        self.set_up_button()
         self.update_data()
 
     def update_state(self, state):
         self.machine_state = state
         self.update_data()
 
-    def start_updating(self):
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_data)
-        self.timer.start(5000)
+    def handle_timer(self):
+        old_state = self.machine_state
+        self.update_data()
+        if old_state != self.machine_state:
+            self.set_up_button()
+            # if the remote machine has been shutdown by someone else, close the tunnel
+            if self.machine_state != "ready":
+                self.ssh_tunnel.close()
 
     def update_data(self):
+        print(f"Machine state is {self.machine_state}")
         self.machine_id_text.setText(self.machine_id)
         self.machine_name_text.setCurrentText(self.machine_name)
         self.host_name_text.setText(self.hostname)
@@ -437,21 +470,26 @@ class MainWindow(QMainWindow):
             case "ready":
                 self.machine_state_bar.setStyleSheet(BACKGROUND_GREEN)
 
+    def start_updating(self):
+        print("Starting background updates")
+        self.timer.start(5000)
+
     def stop_updating(self):
+        print("Stopping background updates")
         self.timer.stop()
 
 
 def handle_error(e):
-    msg = QMessageBox() 
+    msg = QMessageBox()
     msg.setIcon(QMessageBox.Critical)
     if hasattr(e, 'message'):
         msg.setText(e.message)
-    elif hasattr(e, 'strerror'): 
-        msg.setText(e.strerror)       
+    elif hasattr(e, 'strerror'):
+        msg.setText(e.strerror)
     else:
         msg.setText(repr(e))
-    msg.setWindowTitle("RemotePlay Error") 
-    msg.setStandardButtons(QMessageBox.Ok) 
+    msg.setWindowTitle("RemotePlay Error")
+    msg.setStandardButtons(QMessageBox.Ok)
     msg.exec_()
     raise e
 
