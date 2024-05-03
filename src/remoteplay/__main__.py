@@ -20,6 +20,7 @@ BACKGROUND_GREEN = "background-color: green;"
 PAPERSPACE_API = "https://api.paperspace.com/v1"
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 VERSION = '0.2.5'
 
@@ -278,7 +279,7 @@ class MainWindow(QMainWindow):
         self.button.setText(u"Start remote")
 
     def init_paperspace_values(self):
-        print("Initializing ...")
+        logger.info("Initializing ...")
         self.api_key = self.paperspace_key_text.text()
         if self.api_key is not None and len(self.api_key) > 0 and self.machine_name_text.count() == 0:
             self.machine_name_text.currentIndexChanged.disconnect()
@@ -324,7 +325,7 @@ class MainWindow(QMainWindow):
         return self.machines
 
     def save_config(self):
-        print("Saving configuration ...")
+        logger.info("Saving configuration ...")
         home_dir = os.path.expanduser("~")
         if os.name == 'posix':  # Linux and macOS
             config_dir = os.path.join(home_dir, ".remoteplay")
@@ -345,7 +346,7 @@ class MainWindow(QMainWindow):
             config.write(configfile)
 
     def load_config(self):
-        print("Loading configuration ...")
+        logger.info("Loading configuration ...")
         home_dir = os.path.expanduser("~")
         if os.name == 'posix':  # Linux and macOS
             config_dir = os.path.join(home_dir, ".remoteplay")
@@ -387,7 +388,7 @@ class MainWindow(QMainWindow):
 
     def start_stop_machine(self, action):
         try:
-            print(f"{action} requested")
+            logger.info(f"{action} requested")
             self.stop_updating()
             try:
                 self.paperspace_key_text.editingFinished.disconnect()
@@ -411,7 +412,7 @@ class MainWindow(QMainWindow):
             handle_error(e)
 
     def status_change_complete(self):
-        print(f"Target state {self.machine_state} reached")
+        logger.info(f"Target state {self.machine_state} reached")
         self.thread = None
         try:
             self.paperspace_key_text.editingFinished.connect(self.init_paperspace_values)
@@ -437,7 +438,7 @@ class MainWindow(QMainWindow):
                 self.ssh_tunnel.close()
 
     def update_data(self):
-        print(f"Machine state is {self.machine_state}")
+        logger.info(f"Machine state is {self.machine_state}")
         self.machine_id_text.setText(self.machine_id)
         self.machine_name_text.setCurrentText(self.machine_name)
         self.host_name_text.setText(self.hostname)
@@ -471,11 +472,11 @@ class MainWindow(QMainWindow):
                 self.machine_state_bar.setStyleSheet(BACKGROUND_GREEN)
 
     def start_updating(self):
-        print("Starting background updates")
+        logger.info("Starting background updates")
         self.timer.start(5000)
 
     def stop_updating(self):
-        print("Stopping background updates")
+        logger.info("Stopping background updates")
         self.timer.stop()
 
 
