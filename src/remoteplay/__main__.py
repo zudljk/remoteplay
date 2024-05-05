@@ -3,6 +3,7 @@ import os
 import configparser
 import sys
 import logging
+from pkg_resources import get_distribution
 from re import compile
 from .common import check_state, request_get
 from .usbserver import UsbServer
@@ -19,7 +20,7 @@ BACKGROUND_GREEN = "background-color: green;"
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-VERSION = '0.2.7'
+VERSION = get_distribution('remoteplay').version
 
 class MainWindow(QMainWindow):
 
@@ -351,12 +352,10 @@ class MainWindow(QMainWindow):
         match self.machine_state:
             case "off":
                 self.machine_state_bar.setStyleSheet(BACKGROUND_GRAY)
-            case "starting":
-                self.machine_state_bar.setStyleSheet("background-color: yellow;")
-            case "stopping":
-                self.machine_state_bar.setStyleSheet("background-color: yellow;")
             case "ready":
                 self.machine_state_bar.setStyleSheet(BACKGROUND_GREEN)
+            case _:
+                self.machine_state_bar.setStyleSheet("background-color: yellow;")
 
     def start_updating(self):
         logger.info("Starting background updates")
