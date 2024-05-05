@@ -3,141 +3,23 @@ import os
 import configparser
 import sys
 import logging
-from json import loads
-from time import sleep
 from re import compile
-from platform import system
+from .common import check_state, request_get
+from .usbserver import UsbServer
+from .sshtunnel import SshTunnel
+from .worker import ChangeMachineStatus
 
-import psutil
-import requests
-from PyQt5.QtCore import pyqtSignal, QObject, QThread, QTimer, QRect, Qt
+from PyQt5.QtCore import QTimer, QRect, Qt
 from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QLabel, QLineEdit, QPushButton, QApplication, QWidget, \
-    QGridLayout, QGroupBox, QComboBox, QMessageBox, QMessageBox
+    QGridLayout, QGroupBox, QComboBox, QMessageBox
 
 BACKGROUND_GRAY = "background-color: darkgray;"
 BACKGROUND_GREEN = "background-color: green;"
 
-PAPERSPACE_API = "https://api.paperspace.com/v1"
-
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-VERSION = '0.2.6'
-
-
-def check_state(machine_id, api_key):
-    return request_get(machine_id, api_key)["state"] if machine_id else "unknown"
-
-
-def request_get(path, api_key):
-    response = requests.get(f"{PAPERSPACE_API}/machines/{path}", headers={
-        "accept": "application/json",
-        "authorization": f"Bearer {api_key}"
-    })
-    return loads(response.text)
-
-
-def request_patch(path, api_key):
-    response = requests.patch(f"{PAPERSPACE_API}/machines/{path}", headers={
-        "accept": "application/json",
-        "authorization": f"Bearer {api_key}"
-    })
-    return loads(response.text)
-
-
-class SshTunnel:
-
-    def __init__(self):
-        self.host_provider = (lambda: None)
-        self.process = None
-
-    def open(self):
-        if self.host_provider() is not None and not isinstance(self.process, subprocess.Popen):
-            self.process = subprocess.Popen(["ssh", "-N", "-R", "7575:localhost:7575",
-                                             "-o", "StrictHostKeyChecking=no", self.host_provider()])
-
-    def close(self):
-        if self.process:
-            self.process.terminate()
-
-    def check(self):
-        if not self.process:
-            return "closed"
-        return_code = self.process.poll()
-        if return_code is None:
-            return "open"
-        elif return_code > 0:
-            return "error"
-        else:
-            return "closed"
-
-
-class UsbServer:
-
-    def __init__(self, path):
-        self.vhusb_path = path
-
-    def start(self):
-        if self.get_status() != "active":
-            if self.vhusb_path is None:
-                if system() == 'Darwin':
-                    self.vhusb_path = os.path.join("/", "Applications", "VirtualHereServerUniversal.app", "Contents",
-                                                   "MacOS",
-                                                   "vhusbdosx")
-                    subprocess.Popen(self.vhusb_path)
-                elif system() == 'Windows':
-                    from ctypes import windll
-                    self.vhusb_path = os.path.join("C:\\", "Program Files", "VirtualHere", "vhusbdwin64.exe")
-                    windll.shell32.ShellExecuteW(None, "runas", self.vhusb_path, "", None, 1)
-                else:
-                    subprocess.Popen('vhuit64')
-            else:
-                subprocess.Popen(self.vhusb_path)
-
-    @staticmethod
-    def get_status():
-        for proc in psutil.process_iter(['name']):
-            if "vhusb" in proc.info['name']:
-                return "active"
-        return "inactive"
-
-
-class ChangeMachineStatus(QThread):
-    finished = pyqtSignal()
-    status = pyqtSignal(str)
-
-    def __init__(self, machine_id, api_key, action):
-        super().__init__()
-        self.machine_id = machine_id
-        self.api_key = api_key
-        self.action = "start"
-        self.target_state = "ready"
-        self.action = action
-        if action == "start":
-            self.target_state = "ready"
-        else:
-            self.target_state = "off"
-
-    def check_state(self):
-        return check_state(self.machine_id, self.api_key)
-
-    def wait_for_state(self, target_state, status_callback):
-        state = self.check_state()
-        while state != target_state:
-            sleep(5)
-            state = self.check_state()
-            status_callback(state)
-
-    def run(self):
-        def callback(state):
-            self.status.emit(state)
-
-        if self.check_state() != self.target_state:
-            request_patch(f"{self.machine_id}/{self.action}", self.api_key)
-            self.wait_for_state(self.target_state, callback)
-        self.status.emit(self.target_state)
-        self.finished.emit()
-
+VERSION = '0.2.7'
 
 class MainWindow(QMainWindow):
 
@@ -294,6 +176,7 @@ class MainWindow(QMainWindow):
                 self.connect_by, self.hostname = self.determine_host_name()
                 self.machine_state = check_state(self.machine_id, self.api_key)
                 self.save_config()
+                self.set_up_button()
 
     def determine_host_name(self):
         connectors = {"machine_name": self.machine_name, "machine_id": self.machine_id, "public_ip": self.public_ip}
@@ -380,6 +263,10 @@ class MainWindow(QMainWindow):
             self.button.setText("Start remote")
             self.button.clicked.connect((lambda: self.start_stop_machine("start")))
             self.button.setEnabled(True)
+            self.paperspace_key_text.setReadOnly(False)
+        elif self.machine_state is None:
+            self.button.setText("Please enter API key first")
+            self.button.setEnabled(False)
             self.paperspace_key_text.setReadOnly(False)
         else:
             self.button.setText("Please wait")

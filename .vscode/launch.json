@@ -5,10 +5,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Current File",
+            "name": "Python Debugger: RemotePlay",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "program": "remoteplay-runner.py",
+            "cwd": "${workspaceFolder}/src",
             "console": "integratedTerminal"
         }
     ]

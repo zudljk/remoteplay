@@ -4,3 +4,4 @@ src/remoteplay.egg-info
 src/remoteplay/__pycache__
 src/remoteplay/paperspace/__pycache__
 *.spec
+.venv
