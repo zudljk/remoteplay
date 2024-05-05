@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "01cc94003598d2e49130163c71980c2dce214639f8746b3de83d6190f443376f"
+            "sha256": "4967e9c94b04c78932d8f6891c40cdc0f03fe9df12812a25baa3ea59add45638"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -135,6 +135,14 @@
             "markers": "python_version >= '3.5'",
             "version": "==3.7"
         },
+        "macholib": {
+            "hashes": [
+                "sha256:07ae9e15e8e4cd9a788013d81f5908b3609aa76f9b1421bae9c4d7606ec86a30",
+                "sha256:0e315d7583d38b8c77e815b1ecbdbf504a8258d8b3e17b61165c6feb60d18f2c"
+            ],
+            "markers": "sys_platform == 'darwin'",
+            "version": "==1.16.3"
+        },
         "packaging": {
             "hashes": [
                 "sha256:2ddfb553fdf02fb784c234c7ba6ccc288296ceabec964ad2eae3777778130bc5",
@@ -142,14 +150,6 @@
             ],
             "markers": "python_version >= '3.7'",
             "version": "==24.0"
-        },
-        "pefile": {
-            "hashes": [
-                "sha256:82e6114004b3d6911c77c3953e3838654b04511b8b66e8583db70c65998017dc",
-                "sha256:da185cd2af68c08a6cd4481f7325ed600a88f6a813bad9dea07ab3ef73d8d8d6"
-            ],
-            "markers": "sys_platform == 'win32'",
-            "version": "==2023.2.7"
         },
         "psutil": {
             "hashes": [
@@ -216,12 +216,10 @@
         },
         "pyqt5-qt5": {
             "hashes": [
-                "sha256:1988f364ec8caf87a6ee5d5a3a5210d57539988bf8e84714c7d60972692e2f4a",
-                "sha256:750b78e4dba6bdf1607febedc08738e318ea09e9b10aea9ff0d73073f11f6962",
-                "sha256:76980cd3d7ae87e3c7a33bfebfaee84448fd650bad6840471d6cae199b56e154",
-                "sha256:9cc7a768b1921f4b982ebc00a318ccb38578e44e45316c7a4a850e953e1dd327"
+                "sha256:141859f2ffe04cc6c5db970e2b6ad9f98897805d886a14c52614e3799daab6d6",
+                "sha256:92575a9e96a27c4ed67c56c7048ded7461a1655d5d21f0e05064664e6e9fcbdf"
             ],
-            "version": "==5.15.2"
+            "version": "==5.15.13"
         },
         "pyqt5-sip": {
             "hashes": [
@@ -249,14 +247,6 @@
             ],
             "markers": "python_version >= '3.7'",
             "version": "==12.13.0"
-        },
-        "pywin32-ctypes": {
-            "hashes": [
-                "sha256:3426e063bdd5fd4df74a14fa3cf80a0b42845a87e1d1e81f6549f9daec593a60",
-                "sha256:bf490a1a709baf35d688fe0ecf980ed4de11d2b3e37b51e5442587a75d9957e7"
-            ],
-            "markers": "sys_platform == 'win32'",
-            "version": "==0.2.2"
         },
         "requests": {
             "hashes": [
