@@ -73,6 +73,9 @@ jobs:
     - name: Add readme
       run: cp README.md images/Applications dist
 
+    - name: Add DS_Store
+      run: cp images/DS_Store dist/.DS_Store
+
     - name: Create DMG
       run: hdiutil create -format UDZO -ov -volname RemotePlay -srcfolder dist RemotePlay.dmg
 
