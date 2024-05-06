@@ -71,7 +71,7 @@ jobs:
       run: rm -rf dist/remoteplay
 
     - name: Add readme
-      run: cp README.md dist
+      run: cp README.md images/Applications dist
 
     - name: Create DMG
       run: hdiutil create -format UDZO -ov -volname RemotePlay -srcfolder dist RemotePlay.dmg
