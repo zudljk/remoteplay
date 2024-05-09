@@ -148,6 +148,7 @@ class RemotePlayTest(unittest.TestCase):
         self.mock_main_window = TestMainWindow()
 
         self.mock_request_get.assert_called_with("", API_KEY)
+        self.assertEqual(self.mock_main_window.button.text(), 'Start remote')
 
         self.mock_main_window.start_stop_machine("start")
 
@@ -158,6 +159,11 @@ class RemotePlayTest(unittest.TestCase):
         self.assertEqual(self.mock_main_window.machine_state_bar.text(), 'ready')
         self.assertEqual(self.mock_main_window.button.text(), 'Stop remote')
         app.quit()
+
+    # TODO: Test external status change of remote machine
+    # TODO: Test shutdown of remote machine
+    # TODO: Test entering of API key
+    # TODO: Test selecting of different machine
 
     if __name__ == '__main__':
         unittest.main()
