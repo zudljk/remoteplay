@@ -1,5 +1,6 @@
 import subprocess
 
+
 class SshTunnel:
 
     def __init__(self):
@@ -7,7 +8,7 @@ class SshTunnel:
         self.process = None
 
     def open(self):
-        if self.host_provider() is not None and not isinstance(self.process, subprocess.Popen):
+        if self.host_provider() is not None and self.process is None:
             self.process = subprocess.Popen(["ssh", "-N", "-R", "7575:localhost:7575",
                                              "-o", "StrictHostKeyChecking=no", self.host_provider()])
 
