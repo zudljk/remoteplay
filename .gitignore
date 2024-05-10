@@ -10,3 +10,4 @@ src/remoteplay/paperspace/__pycache__
 coverage.*
 .coverage
 htmlcov
+*.dump
