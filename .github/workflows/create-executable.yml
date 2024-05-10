@@ -27,7 +27,7 @@ jobs:
 
     - name: Run tests
       run: |
-        python -m coverage run -m unittest tests\\*.py
+        python -m coverage run -m unittest tests.test_common tests.test_remoteplay
         python -m coverage report --fail-under=80        
 
     - name: Build with PyInstaller

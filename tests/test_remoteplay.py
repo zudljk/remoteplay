@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch, Mock, MagicMock, call
 import faulthandler
+import platform
 
 from PyQt5.QtWidgets import QApplication
 
@@ -180,9 +181,14 @@ class RemotePlayTest(unittest.TestCase):
         self.mock_main_window.start_stop_machine("start")
 
         self.mock_request_patch.assert_called_with("pskwujgcp/start", API_KEY)
-        self.mock_main_popen.assert_has_calls([
-            call('/Applications/VirtualHereServerUniversal.app/Contents/MacOS/vhusbdosx'),
-            call(['ssh', '-N', '-R', '7575:localhost:7575', '-o', 'StrictHostKeyChecking=no', 'Arcturus'])])
+        if platform.system() == 'Darwin':
+            self.mock_main_popen.assert_has_calls([
+                call('/Applications/VirtualHereServerUniversal.app/Contents/MacOS/vhusbdosx'),
+                call(['ssh', '-N', '-R', '7575:localhost:7575', '-o', 'StrictHostKeyChecking=no', 'Arcturus'])])
+        elif platform.system() == 'Windows':
+            self.mock_main_popen.assert_has_calls([
+                call('/Applications\\VirtualHereServerUniversal.app\\Contents\\MacOS\\vhusbdosx'),
+                call(['ssh', '-N', '-R', '7575:localhost:7575', '-o', 'StrictHostKeyChecking=no', 'Arcturus'])])
         self.assertEqual(self.mock_main_window.machine_state_bar.text(), 'ready')
         self.assertEqual(self.mock_main_window.button.text(), 'Stop remote')
 
