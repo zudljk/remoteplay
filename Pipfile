@@ -10,6 +10,7 @@ pyinstaller = "*"
 requests = "*"
 
 [dev-packages]
+coverage = "*"
 
 [requires]
 python_version = "3.12"

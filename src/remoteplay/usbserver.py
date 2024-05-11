@@ -3,6 +3,7 @@ import os
 import subprocess
 import psutil
 
+
 class UsbServer:
 
     def __init__(self, path):

@@ -2,6 +2,8 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from time import sleep
 from .common import check_state, request_patch
 
+POLLING_DELAY = 5
+
 class ChangeMachineStatus(QThread):
     finished = pyqtSignal()
     status = pyqtSignal(str)
@@ -24,7 +26,7 @@ class ChangeMachineStatus(QThread):
     def wait_for_state(self, target_state, status_callback):
         state = self.check_state()
         while state != target_state:
-            sleep(5)
+            sleep(POLLING_DELAY)
             state = self.check_state()
             status_callback(state)
 

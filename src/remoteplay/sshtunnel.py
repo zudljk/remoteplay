@@ -2,13 +2,14 @@ import subprocess
 from platform import system
 
 
+
 class SshTunnel:
     def __init__(self):
         self.host_provider = lambda: None
         self.process = None
 
     def open(self):
-        if self.host_provider() is not None and not isinstance(self.process, subprocess.Popen):
+        if self.host_provider() is not None and self.process is None:
             command = [
                 "ssh",
                 "-N",
@@ -22,7 +23,7 @@ class SshTunnel:
                 self.process = subprocess.Popen(command, creationflags=subprocess.CREATE_NO_WINDOW)
             else:
                 self.process = subprocess.Popen(command)
-            
+
     def close(self):
         if self.process:
             self.process.terminate()

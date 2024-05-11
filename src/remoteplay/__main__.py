@@ -22,6 +22,7 @@ logging.basicConfig(level=logging.INFO)
 
 VERSION = get_distribution('remoteplay').version
 
+
 class MainWindow(QMainWindow):
 
     def __init__(self):

@@ -5,3 +5,9 @@ src/remoteplay/__pycache__
 src/remoteplay/paperspace/__pycache__
 *.spec
 .venv
+.idea/sonarlint
+.idea/inspectionProfiles
+coverage.*
+.coverage
+htmlcov
+*.dump
