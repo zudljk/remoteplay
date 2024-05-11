@@ -27,6 +27,7 @@ class SshTunnel:
     def close(self):
         if self.process:
             self.process.terminate()
+            self.process = None
 
     def check(self):
         if not self.process:
