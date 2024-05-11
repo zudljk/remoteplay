@@ -26,3 +26,12 @@ class SshTunnel:
             return "error"
         else:
             return "closed"
+
+    @staticmethod
+    def get_ssh_config(machine_id):
+        process = subprocess.Popen(["ssh", "-G", machine_id], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        for line in process.stdout:
+            l = line.strip()
+            if l.lower().startswith('hostname'):
+                return l.split()[1]
+        return None

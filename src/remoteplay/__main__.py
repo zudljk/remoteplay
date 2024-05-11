@@ -183,19 +183,17 @@ class MainWindow(QMainWindow):
     def determine_host_name(self):
         connectors = {"machine_name": self.machine_name, "machine_id": self.machine_id, "public_ip": self.public_ip}
         # try to find a "Host" entry in ~/.ssh/config to determine the host name
-        for type, id in connectors.items():
-            process = subprocess.Popen(["ssh", "-G", id], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            for line in process.stdout:
-                l = line.strip()
-                if l.lower().startswith('hostname'):
-                    return type, l.split()[1]
+        for key, value in connectors.items():
+            hostname = SshTunnel.get_ssh_config(value)
+            if hostname:
+                return key, hostname
         # if not found, return the first argument that looks like an IPv4 or IPv6 address
         ip = compile("([0-2][0-9][0-9]\\.?){4}|[0-9:]+")
-        for id in connectors.values():
-            if ip.match(id):
-                return id
+        for machine_id in connectors.values():
+            if ip.match(machine_id):
+                return "public_ip", machine_id
         # if none found, return none
-        return None
+        return None, None
 
     def get_machine(self, machine):
         try:
