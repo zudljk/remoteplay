@@ -240,6 +240,31 @@ class RemotePlayTest(unittest.TestCase):
         self.assertEqual(self.mock_main_window.machine_state_bar.text(), 'off')
         self.assertEqual(self.mock_main_window.button.text(), 'Start remote')
 
+    def test_external_startup(self):
+
+        self.mock_main_window = TestMainWindow()
+
+        self.assertEqual(self.mock_main_window.machine_state_bar.text(), 'off')
+        self.assertEqual(self.mock_main_window.button.text(), 'Start remote')
+
+        startup_states = ["ready", "ready", "stopping", "stopping", "stopping"]
+        startup_states_iter = iter(startup_states)
+        self.mock_state = (lambda: next(startup_states_iter, "ready"))
+
+        for state in startup_states:
+            self.mock_main_window.handle_timer()
+            self.assertEqual(self.mock_main_window.machine_state, state)
+        self.mock_main_window.handle_timer()
+
+        self.mock_main_popen.assert_has_calls([
+            # called to find the host name
+            call(['ssh', '-G', 'Arcturus'], stdout=-1, stderr=-1, text=True),
+            call(['ssh', '-N', '-R', '7575:localhost:7575', '-o', 'StrictHostKeyChecking=no', 'Arcturus'])
+        ])
+
+        self.assertEqual(self.mock_main_window.machine_state_bar.text(), 'ready')
+        self.assertEqual(self.mock_main_window.button.text(), 'Stop remote')
+
     def test_change_api_key(self):
         TestMainWindow.mock_api_key = None
         TestMainWindow.mock_name = None

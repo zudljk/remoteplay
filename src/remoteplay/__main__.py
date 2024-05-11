@@ -322,8 +322,11 @@ class MainWindow(QMainWindow):
         self.update_data()
         if old_state != self.machine_state:
             self.set_up_button()
+            # if the remote machine has been started up by someone else, open the tunnel
+            if self.machine_state == "ready":
+                self.ssh_tunnel.open()
             # if the remote machine has been shutdown by someone else, close the tunnel
-            if self.machine_state != "ready":
+            else:
                 self.ssh_tunnel.close()
 
     def update_data(self):
